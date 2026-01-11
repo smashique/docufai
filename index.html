@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Docufai - Professional AI Document Architect</title>
+    
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#6366f1">
+    <link rel="apple-touch-icon" href="/icon.svg">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/html-docx-js/dist/html-docx.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver/dist/FileSaver.min.js"></script>
@@ -17,6 +22,7 @@
         .preview-scroll::-webkit-scrollbar { height: 6px; }
         .preview-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
         .page-thumb.active { border: 4px solid #6366f1; background: #f5f3ff; transform: scale(0.95); }
+        .drop-active { border-color: #6366f1 !important; background-color: #f5f3ff !important; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -28,10 +34,11 @@
         </div>
         
         <div class="flex items-center space-x-4">
-            <a href="docufai-extension.zip" download class="bg-amber-100 border border-amber-200 text-amber-700 px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center space-x-2 hover:bg-amber-200 transition-all shadow-sm">
-                <span>Download Extension</span>
-                <span class="bg-amber-500 text-white p-1 rounded-md">⬇️</span>
-            </a>
+            <button id="rechargeBtn" class="bg-gradient-to-r from-amber-500 to-orange-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase flex items-center space-x-2 hover:scale-95 transition-all shadow-lg hidden">
+                <span>Unlock Credits</span>
+                <span>⚡</span>
+            </button>
+
             <div class="h-8 w-[1px] bg-slate-200"></div>
             <div class="text-right">
                 <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-right">Credits</p>
@@ -48,23 +55,23 @@
         <aside class="lg:col-span-1 space-y-6">
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
                 <h3 class="font-extrabold text-slate-800 mb-5 italic tracking-tight uppercase text-xs">📁 Secure Upload</h3>
+                
                 <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer bg-slate-50 hover:border-indigo-500 transition-all">
                     <input type="file" id="fileInput" accept="image/*,application/pdf" class="hidden">
-                    <p class="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Select Image/PDF</p>
+                    <p class="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Drop File Here or Click</p>
                 </div>
 
                 <div id="pageSelector" class="hidden mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
                     <div class="flex justify-between items-center mb-2">
                         <label class="text-[10px] font-bold text-indigo-600 uppercase">Target Page</label>
-                        <span class="text-[10px] font-black text-indigo-400 uppercase">Total Pages: <span id="totalPages">0</span></span>
+                        <span class="text-[10px] font-black text-indigo-400 uppercase">Total: <span id="totalPages">0</span></span>
                     </div>
                     <input type="number" id="targetPage" value="1" min="1" class="w-full px-4 py-2 rounded-xl border border-indigo-200 outline-none text-sm font-bold">
                 </div>
 
                 <div id="previewContainer" class="hidden mt-4">
                     <p class="text-[9px] font-bold text-slate-400 uppercase mb-2 italic">Select Page Preview</p>
-                    <div id="previewScroll" class="preview-scroll flex space-x-2 overflow-x-auto pb-2">
-                        </div>
+                    <div id="previewScroll" class="preview-scroll flex space-x-2 overflow-x-auto pb-2"></div>
                 </div>
 
                 <button id="processBtn" class="w-full mt-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-xl transition-all active:scale-95">CONVERT PAGE ⚡</button>
@@ -82,7 +89,7 @@
                 <button id="downloadBtn" class="hidden bg-emerald-600 text-white text-[10px] font-bold px-4 py-1.5 rounded-lg transition-all hover:bg-emerald-700">Download .docx</button>
             </div>
             <div class="bg-white rounded-b-[2rem] shadow-2xl border border-slate-200 overflow-hidden min-h-[800px]">
-                <iframe id="outputFrame" srcdoc="<body style='display:flex; justify-content:center; align-items:center; height:100vh; color:#94a3b8; font-family:sans-serif;'>কনভার্ট করার পর আউটপুট এখানে আসবে...</body>"></iframe>
+                <iframe id="outputFrame" srcdoc="<body style='display:flex; justify-content:center; align-items:center; height:100vh; color:#94a3b8; font-family:sans-serif;'>আউটপুট এখানে আসবে...</body>"></iframe>
             </div>
         </section>
     </main>
@@ -92,7 +99,13 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // User Identity
+        // PWA Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js');
+            });
+        }
+
         if (!localStorage.getItem('doc_user_id')) {
             localStorage.setItem('doc_user_id', 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase());
         }
@@ -100,15 +113,29 @@
         const fileInput = document.getElementById('fileInput');
         const dropZone = document.getElementById('dropZone');
         const processBtn = document.getElementById('processBtn');
+        const rechargeBtn = document.getElementById('rechargeBtn');
         const targetPageInput = document.getElementById('targetPage');
         const previewScroll = document.getElementById('previewScroll');
         const previewContainer = document.getElementById('previewContainer');
         const totalPagesSpan = document.getElementById('totalPages');
 
+        // Drag & Drop Functionality
         dropZone.onclick = () => fileInput.click();
+        
+        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('drop-active'); };
+        dropZone.ondragleave = () => dropZone.classList.remove('drop-active');
+        dropZone.ondrop = (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drop-active');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        };
 
-        fileInput.onchange = async () => {
-            const file = fileInput.files[0];
+        fileInput.onchange = () => { if (fileInput.files[0]) handleFileSelect(fileInput.files[0]); };
+
+        async function handleFileSelect(file) {
             if (file && file.type === "application/pdf") {
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
@@ -121,7 +148,7 @@
                 document.getElementById('pageSelector').classList.add('hidden');
                 previewContainer.classList.add('hidden');
             }
-        };
+        }
 
         async function renderPreviews(pdf) {
             previewScroll.innerHTML = '';
@@ -136,8 +163,7 @@
                     canvas.classList.add('active');
                 };
                 const context = canvas.getContext('2d');
-                canvas.height = viewport.height;
-                canvas.width = viewport.width;
+                canvas.height = viewport.height; canvas.width = viewport.width;
                 await page.render({ canvasContext: context, viewport: viewport }).promise;
                 previewScroll.appendChild(canvas);
             }
@@ -178,10 +204,9 @@
 
                 const data = await response.json();
 
-                // Payment Exhausted
                 if (response.status === 402) {
-                    alert("আপনার ক্রেডিট শেষ! রিচার্জ করতে OK প্রেস করুন।");
-                    window.location.href = `/api/pay?userId=${localStorage.getItem('doc_user_id')}`;
+                    rechargeBtn.classList.remove('hidden'); // Show unlock button
+                    alert("আপনার ক্রেডিট শেষ! রিচার্জ করতে Unlock বাটন ব্যবহার করুন।");
                     return;
                 }
 
@@ -189,7 +214,6 @@
 
                 let rawHTML = data.choices[0].message.content.replace(/```html|```/g, "").trim();
                 
-                // Final MathJax Fix
                 const finalContent = `
                     <!DOCTYPE html>
                     <html>
@@ -218,12 +242,13 @@
                 `;
 
                 document.getElementById('outputFrame').srcdoc = finalContent;
-                
-                // Update UI Credits
                 document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 document.getElementById('totalCredits').innerText = data.total_credits;
                 document.getElementById('displayCounter').innerText = data.updated_count;
                 
+                // If credits are low, show recharge button
+                if ((data.total_credits - data.updated_count) <= 0) rechargeBtn.classList.remove('hidden');
+
                 document.getElementById('downloadBtn').classList.remove('hidden');
                 document.getElementById('statusBox').classList.add('hidden');
 
@@ -231,6 +256,11 @@
                 alert(err.message);
                 document.getElementById('statusBox').classList.add('hidden');
             }
+        };
+
+        // Unlock/Recharge Button Logic
+        rechargeBtn.onclick = () => {
+            window.location.href = `/api/pay?userId=${localStorage.getItem('doc_user_id')}`;
         };
 
         document.getElementById('downloadBtn').onclick = function() {
