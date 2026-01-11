@@ -1,8 +1,16 @@
 {
-  "name": "docufai",
+  "name": "docufai-pro",
   "version": "1.0.0",
+  "description": "Professional AI Document Architect with Math support",
+  "main": "index.html",
   "type": "module",
+  "scripts": {
+    "start": "vercel dev"
+  },
   "dependencies": {
-    "@supabase/supabase-js": "^2.39.0"
-  }
+    "@supabase/supabase-js": "^2.39.0",
+    "node-fetch": "^3.3.2"
+  },
+  "author": "S M Ashique",
+  "license": "MIT"
 }
