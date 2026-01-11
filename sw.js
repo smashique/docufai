@@ -1,5 +1,5 @@
-// sw.js
-const CACHE_NAME = 'docufai-pro-v1';
+// sw.js - Docufai Pro Service Worker
+const CACHE_NAME = 'docufai-v2-perfect';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -7,11 +7,11 @@ const ASSETS_TO_CACHE = [
   '/icon.svg'
 ];
 
-// ১. ইনস্টল ইভেন্ট: সব দরকারি ফাইল ক্যাশ করা
+// ১. ইনস্টল ইভেন্ট: সব দরকারি ফাইল ক্যাশ (Cache) করা
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Caching assets...');
+      console.log('Docufai SW: Caching Assets...');
       return cache.addAll(ASSETS_TO_CACHE);
     })
   );
@@ -24,8 +24,24 @@ self.addEventListener('fetch', (event) => {
       // যদি ক্যাশে ফাইল থাকে তবে সেটি দাও, নাহলে নেটওয়ার্ক থেকে নাও
       return response || fetch(event.request);
     }).catch(() => {
-      // যদি ইন্টারনেট না থাকে এবং ক্যাশেও ফাইল না থাকে
+      // যদি ইন্টারনেট না থাকে তবে ডিফল্ট হিসেবে index.html দেখাও
       return caches.match('/index.html');
+    })
+  );
+});
+
+// ৩. অ্যাক্টিভেট ইভেন্ট: পুরাতন ক্যাশ পরিষ্কার করা
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            console.log('Docufai SW: Clearing Old Cache...');
+            return caches.delete(cache);
+          }
+        })
+      );
     })
   );
 });
