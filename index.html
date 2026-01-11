@@ -16,7 +16,7 @@
         #outputFrame { width: 100%; height: 800px; border: none; background: #fff; }
         .preview-scroll::-webkit-scrollbar { height: 6px; }
         .preview-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
-        .page-thumb.active { border-color: #6366f1; background: #f5f3ff; }
+        .page-thumb.active { border: 4px solid #6366f1; background: #f5f3ff; transform: scale(0.95); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -38,7 +38,7 @@
                 <p class="text-xs font-black text-emerald-600 tracking-tighter italic"><span id="remCredits">10</span> / <span id="totalCredits">10</span></p>
             </div>
             <div class="text-right">
-                <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Total Pages</p>
+                <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-right">Lifetime Pages</p>
                 <p id="displayCounter" class="text-xs font-black text-slate-800 tracking-tighter">0</p>
             </div>
         </div>
@@ -47,7 +47,7 @@
     <main class="max-w-7xl mx-auto p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-4 gap-8">
         <aside class="lg:col-span-1 space-y-6">
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                <h3 class="font-extrabold text-slate-800 mb-5 flex items-center italic tracking-tight uppercase text-xs">📁 Secure Upload</h3>
+                <h3 class="font-extrabold text-slate-800 mb-5 italic tracking-tight uppercase text-xs">📁 Secure Upload</h3>
                 <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer bg-slate-50 hover:border-indigo-500 transition-all">
                     <input type="file" id="fileInput" accept="image/*,application/pdf" class="hidden">
                     <p class="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Select Image/PDF</p>
@@ -56,18 +56,17 @@
                 <div id="pageSelector" class="hidden mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
                     <div class="flex justify-between items-center mb-2">
                         <label class="text-[10px] font-bold text-indigo-600 uppercase">Target Page</label>
-                        <span class="text-[10px] font-black text-indigo-400 uppercase">Total: <span id="totalPages">0</span></span>
+                        <span class="text-[10px] font-black text-indigo-400 uppercase">Total Pages: <span id="totalPages">0</span></span>
                     </div>
                     <input type="number" id="targetPage" value="1" min="1" class="w-full px-4 py-2 rounded-xl border border-indigo-200 outline-none text-sm font-bold">
                 </div>
 
                 <div id="previewContainer" class="hidden mt-4">
-                    <p class="text-[9px] font-bold text-slate-400 uppercase mb-2">Page Preview</p>
+                    <p class="text-[9px] font-bold text-slate-400 uppercase mb-2 italic">Select Page Preview</p>
                     <div id="previewScroll" class="preview-scroll flex space-x-2 overflow-x-auto pb-2">
                         </div>
                 </div>
 
-                <div id="fileList" class="mt-4 space-y-2"></div>
                 <button id="processBtn" class="w-full mt-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-xl transition-all active:scale-95">CONVERT PAGE ⚡</button>
             </div>
 
@@ -80,10 +79,10 @@
         <section class="lg:col-span-3">
             <div class="bg-slate-900 rounded-t-[2rem] px-6 py-4 flex items-center justify-between">
                 <span class="text-slate-400 text-[10px] font-mono font-bold uppercase tracking-[0.3em]">Architect Terminal</span>
-                <button id="downloadBtn" class="hidden bg-emerald-600 text-white text-[10px] font-bold px-4 py-1.5 rounded-lg transition-all">Download .docx</button>
+                <button id="downloadBtn" class="hidden bg-emerald-600 text-white text-[10px] font-bold px-4 py-1.5 rounded-lg transition-all hover:bg-emerald-700">Download .docx</button>
             </div>
             <div class="bg-white rounded-b-[2rem] shadow-2xl border border-slate-200 overflow-hidden min-h-[800px]">
-                <iframe id="outputFrame" srcdoc="<body style='display:flex; justify-content:center; align-items:center; height:100vh; color:#94a3b8; font-family:sans-serif;'>আউটপুট এখানে আসবে...</body>"></iframe>
+                <iframe id="outputFrame" srcdoc="<body style='display:flex; justify-content:center; align-items:center; height:100vh; color:#94a3b8; font-family:sans-serif;'>কনভার্ট করার পর আউটপুট এখানে আসবে...</body>"></iframe>
             </div>
         </section>
     </main>
@@ -93,6 +92,7 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
+        // User Identity
         if (!localStorage.getItem('doc_user_id')) {
             localStorage.setItem('doc_user_id', 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase());
         }
@@ -129,7 +129,7 @@
                 const page = await pdf.getPage(i);
                 const viewport = page.getViewport({ scale: 0.3 });
                 const canvas = document.createElement('canvas');
-                canvas.className = `page-thumb shrink-0 border-2 border-transparent rounded-lg cursor-pointer hover:border-indigo-300 transition-all`;
+                canvas.className = `page-thumb shrink-0 border-2 border-transparent rounded-lg cursor-pointer transition-all`;
                 canvas.onclick = () => {
                     targetPageInput.value = i;
                     document.querySelectorAll('.page-thumb').forEach(el => el.classList.remove('active'));
@@ -178,15 +178,18 @@
 
                 const data = await response.json();
 
+                // Payment Exhausted
                 if (response.status === 402) {
-                    alert("ক্রেডিট শেষ!");
-                    window.open("https://wa.me/YOUR_NUMBER", "_blank");
+                    alert("আপনার ক্রেডিট শেষ! রিচার্জ করতে OK প্রেস করুন।");
+                    window.location.href = `/api/pay?userId=${localStorage.getItem('doc_user_id')}`;
                     return;
                 }
 
+                if (data.error) throw new Error(data.error);
+
                 let rawHTML = data.choices[0].message.content.replace(/```html|```/g, "").trim();
                 
-                // MathJax Fix Integration
+                // Final MathJax Fix
                 const finalContent = `
                     <!DOCTYPE html>
                     <html>
@@ -199,7 +202,11 @@
                             };
                         </script>
                         <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-                        <style>body { font-family: 'Times New Roman', serif; padding: 20px; }</style>
+                        <style>
+                            body { font-family: 'Times New Roman', serif; padding: 40px; color: #334155; line-height: 1.6; }
+                            table { border-collapse: collapse; width: 100%; margin: 10px 0; }
+                            th, td { border: 1px solid #cbd5e1; padding: 8px; }
+                        </style>
                     </head>
                     <body>
                         <div id="main-content">${rawHTML}</div>
@@ -211,8 +218,12 @@
                 `;
 
                 document.getElementById('outputFrame').srcdoc = finalContent;
+                
+                // Update UI Credits
                 document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
+                document.getElementById('totalCredits').innerText = data.total_credits;
                 document.getElementById('displayCounter').innerText = data.updated_count;
+                
                 document.getElementById('downloadBtn').classList.remove('hidden');
                 document.getElementById('statusBox').classList.add('hidden');
 
@@ -226,7 +237,7 @@
             const frame = document.getElementById('outputFrame');
             const frameDoc = frame.contentDocument || frame.contentWindow.document;
             const content = frameDoc.getElementById('main-content').innerHTML;
-            const converted = htmlDocx.asBlob(`<!DOCTYPE html><html><body>${content}</body></html>`);
+            const converted = htmlDocx.asBlob(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${content}</body></html>`);
             saveAs(converted, 'Docufai_Export.docx');
         };
     </script>
