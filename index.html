@@ -22,7 +22,7 @@
         .preview-scroll::-webkit-scrollbar { height: 6px; }
         .preview-scroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
         .page-thumb.active { border: 4px solid #6366f1; background: #f5f3ff; transform: scale(0.95); }
-        .drop-active { border-color: #6366f1 !important; background-color: #f5f3ff !important; }
+        .drop-active { border-color: #6366f1 !important; background-color: #f0fdf4 !important; }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -56,9 +56,11 @@
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
                 <h3 class="font-extrabold text-slate-800 mb-5 italic tracking-tight uppercase text-xs">📁 Secure Upload</h3>
                 
-                <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer bg-slate-50 hover:border-indigo-500 transition-all">
+                <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer bg-slate-50 hover:border-indigo-500 transition-all relative">
                     <input type="file" id="fileInput" accept="image/*,application/pdf" class="hidden">
-                    <p class="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Drop File Here or Click</p>
+                    <div id="dropText">
+                        <p class="text-[10px] text-slate-600 font-bold uppercase tracking-widest">Drop File Here or Click</p>
+                    </div>
                 </div>
 
                 <div id="pageSelector" class="hidden mt-6 p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
@@ -99,11 +101,9 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // PWA Service Worker Registration
+        // PWA App Registration
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js');
-            });
+            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js'); });
         }
 
         if (!localStorage.getItem('doc_user_id')) {
@@ -119,23 +119,29 @@
         const previewContainer = document.getElementById('previewContainer');
         const totalPagesSpan = document.getElementById('totalPages');
 
-        // Drag & Drop Functionality
+        // Drag and Drop Logic Fix
         dropZone.onclick = () => fileInput.click();
         
-        dropZone.ondragover = (e) => { e.preventDefault(); dropZone.classList.add('drop-active'); };
-        dropZone.ondragleave = () => dropZone.classList.remove('drop-active');
-        dropZone.ondrop = (e) => {
-            e.preventDefault();
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+        });
+
+        dropZone.addEventListener('dragover', () => dropZone.classList.add('drop-active'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drop-active'));
+        
+        dropZone.addEventListener('drop', (e) => {
             dropZone.classList.remove('drop-active');
-            if (e.dataTransfer.files.length) {
-                fileInput.files = e.dataTransfer.files;
-                handleFileSelect(e.dataTransfer.files[0]);
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                fileInput.files = files;
+                handleFileSelect(files[0]);
             }
-        };
+        });
 
         fileInput.onchange = () => { if (fileInput.files[0]) handleFileSelect(fileInput.files[0]); };
 
         async function handleFileSelect(file) {
+            document.getElementById('dropText').innerHTML = `<p class='text-[10px] text-indigo-600 font-black uppercase'>${file.name}</p>`;
             if (file && file.type === "application/pdf") {
                 const arrayBuffer = await file.arrayBuffer();
                 const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
@@ -184,9 +190,8 @@
         processBtn.onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return alert("ফাইল সিলেক্ট করুন!");
-
             document.getElementById('statusBox').classList.remove('hidden');
-            document.getElementById('statusMsg').innerText = "Architecting Math & Layout...";
+            document.getElementById('statusMsg').innerText = "Architecting Layout...";
 
             try {
                 let b64Data = file.type === "application/pdf" ? await getPageAsB64(file, parseInt(targetPageInput.value)) : await new Promise(res => {
@@ -196,78 +201,48 @@
                 const response = await fetch("/api/engine", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ 
-                        imageB64: b64Data,
-                        userInfo: { id: localStorage.getItem('doc_user_id') }
-                    }) 
+                    body: JSON.stringify({ imageB64: b64Data, userInfo: { id: localStorage.getItem('doc_user_id') } })
                 });
 
                 const data = await response.json();
 
                 if (response.status === 402) {
-                    rechargeBtn.classList.remove('hidden'); // Show unlock button
-                    alert("আপনার ক্রেডিট শেষ! রিচার্জ করতে Unlock বাটন ব্যবহার করুন।");
+                    rechargeBtn.classList.remove('hidden'); // Unlock button show
+                    alert("আপনার ক্রেডিট শেষ! Unlock Credits বাটনে ক্লিক করুন।");
+                    document.getElementById('statusBox').classList.add('hidden');
                     return;
                 }
 
-                if (data.error) throw new Error(data.error);
-
                 let rawHTML = data.choices[0].message.content.replace(/```html|```/g, "").trim();
                 
-                const finalContent = `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <meta charset="utf-8">
-                        <script>
-                            window.MathJax = {
-                                tex: { inlineMath: [['$', '$'], ['\\(', '\\)']], displayMath: [['$$', '$$']] },
-                                options: { enableMenu: false }
-                            };
-                        </script>
-                        <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-                        <style>
-                            body { font-family: 'Times New Roman', serif; padding: 40px; color: #334155; line-height: 1.6; }
-                            table { border-collapse: collapse; width: 100%; margin: 10px 0; }
-                            th, td { border: 1px solid #cbd5e1; padding: 8px; }
-                        </style>
-                    </head>
-                    <body>
-                        <div id="main-content">${rawHTML}</div>
-                        <script>
-                            window.onload = () => { if(window.MathJax.typeset) window.MathJax.typeset(); };
-                        </script>
-                    </body>
-                    </html>
-                `;
+                // MathJax Template Fix
+                const mathHeader = "<script>window.MathJax = { tex: { inlineMath: [['$', '$']] } };<\/script><script src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js' async><\/script>";
+                const finalContent = "<html><head>" + mathHeader + "<style>body{font-family:serif;padding:30px;line-height:1.6;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ddd;padding:8px;}</style></head><body><div id='main-content'>" + rawHTML + "</div></body></html>";
 
                 document.getElementById('outputFrame').srcdoc = finalContent;
                 document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 document.getElementById('totalCredits').innerText = data.total_credits;
                 document.getElementById('displayCounter').innerText = data.updated_count;
                 
-                // If credits are low, show recharge button
                 if ((data.total_credits - data.updated_count) <= 0) rechargeBtn.classList.remove('hidden');
-
                 document.getElementById('downloadBtn').classList.remove('hidden');
                 document.getElementById('statusBox').classList.add('hidden');
 
             } catch (err) {
-                alert(err.message);
+                alert("Error: " + err.message);
                 document.getElementById('statusBox').classList.add('hidden');
             }
         };
 
-        // Unlock/Recharge Button Logic
         rechargeBtn.onclick = () => {
-            window.location.href = `/api/pay?userId=${localStorage.getItem('doc_user_id')}`;
+            window.location.href = "/api/pay?userId=" + localStorage.getItem('doc_user_id');
         };
 
         document.getElementById('downloadBtn').onclick = function() {
             const frame = document.getElementById('outputFrame');
             const frameDoc = frame.contentDocument || frame.contentWindow.document;
             const content = frameDoc.getElementById('main-content').innerHTML;
-            const converted = htmlDocx.asBlob(`<!DOCTYPE html><html><head><meta charset="utf-8"></head><body>${content}</body></html>`);
+            const converted = htmlDocx.asBlob("<!DOCTYPE html><html><body>" + content + "</body></html>");
             saveAs(converted, 'Docufai_Export.docx');
         };
     </script>
