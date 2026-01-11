@@ -101,7 +101,7 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // PWA App Registration
+        // PWA Setup
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js'); });
         }
@@ -110,6 +110,7 @@
             localStorage.setItem('doc_user_id', 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase());
         }
 
+        // DOM Elements
         const fileInput = document.getElementById('fileInput');
         const dropZone = document.getElementById('dropZone');
         const processBtn = document.getElementById('processBtn');
@@ -119,25 +120,20 @@
         const previewContainer = document.getElementById('previewContainer');
         const totalPagesSpan = document.getElementById('totalPages');
 
-        // Drag and Drop Logic Fix
+        // Drag & Drop
         dropZone.onclick = () => fileInput.click();
-        
         ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
             dropZone.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
         });
-
         dropZone.addEventListener('dragover', () => dropZone.classList.add('drop-active'));
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drop-active'));
-        
         dropZone.addEventListener('drop', (e) => {
             dropZone.classList.remove('drop-active');
-            const files = e.dataTransfer.files;
-            if (files.length) {
-                fileInput.files = files;
-                handleFileSelect(files[0]);
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileSelect(e.dataTransfer.files[0]);
             }
         });
-
         fileInput.onchange = () => { if (fileInput.files[0]) handleFileSelect(fileInput.files[0]); };
 
         async function handleFileSelect(file) {
@@ -187,11 +183,12 @@
             return canvas.toDataURL('image/png').split(',')[1];
         }
 
+        // PROCESS FUNCTION
         processBtn.onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return alert("ফাইল সিলেক্ট করুন!");
             document.getElementById('statusBox').classList.remove('hidden');
-            document.getElementById('statusMsg').innerText = "Architecting Layout...";
+            document.getElementById('statusMsg').innerText = "Analyzing Page Geometry...";
 
             try {
                 let b64Data = file.type === "application/pdf" ? await getPageAsB64(file, parseInt(targetPageInput.value)) : await new Promise(res => {
@@ -207,19 +204,85 @@
                 const data = await response.json();
 
                 if (response.status === 402) {
-                    rechargeBtn.classList.remove('hidden'); // Unlock button show
+                    rechargeBtn.classList.remove('hidden');
                     alert("আপনার ক্রেডিট শেষ! Unlock Credits বাটনে ক্লিক করুন।");
                     document.getElementById('statusBox').classList.add('hidden');
                     return;
                 }
 
-                let rawHTML = data.choices[0].message.content.replace(/```html|```/g, "").trim();
-                
-                // MathJax Template Fix
-                const mathHeader = "<script>window.MathJax = { tex: { inlineMath: [['$', '$']] } };<\/script><script src='https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js' async><\/script>";
-                const finalContent = "<html><head>" + mathHeader + "<style>body{font-family:serif;padding:30px;line-height:1.6;}table{border-collapse:collapse;width:100%;}td,th{border:1px solid #ddd;padding:8px;}</style></head><body><div id='main-content'>" + rawHTML + "</div></body></html>";
+                let aiContent = data.choices[0].message.content.replace(/```html|```/g, "").trim();
 
-                document.getElementById('outputFrame').srcdoc = finalContent;
+                // 1. EXTRACT HEADER/FOOTER
+                let headerContent = "";
+                let footerContent = "";
+                let bodyContent = aiContent;
+
+                const headerMatch = aiContent.match(/<header>(.*?)<\/header>/s);
+                if (headerMatch) {
+                    headerContent = headerMatch[1];
+                    bodyContent = bodyContent.replace(headerMatch[0], "");
+                }
+                const footerMatch = aiContent.match(/<footer>(.*?)<\/footer>/s);
+                if (footerMatch) {
+                    footerContent = footerMatch[1];
+                    bodyContent = bodyContent.replace(footerMatch[0], "");
+                }
+
+                // 2. MS WORD XML TEMPLATE
+                const wordHTML = `
+                    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                    <head>
+                        <meta charset="utf-8">
+                        <title>Docufai Replica</title>
+                        <script>
+                            window.MathJax = { tex: { inlineMath: [['$', '$']] }, svg: { fontCache: 'global' } };
+                        <\/script>
+                        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async><\/script>
+                        
+                        <xml>
+                            <w:WordDocument>
+                                <w:View>Print</w:View>
+                                <w:Zoom>100</w:Zoom>
+                            </w:WordDocument>
+                        </xml>
+
+                        <style>
+                            @page {
+                                size: 21cm 29.7cm;
+                                margin: 1.27cm 1.27cm 1.27cm 1.27cm;
+                                mso-page-orientation: portrait;
+                                mso-header: url("docufai_header.htm") h1;
+                                mso-footer: url("docufai_footer.htm") f1;
+                            }
+                            @page Section1 {
+                                size: 21cm 29.7cm;
+                                margin: 1.27cm 1.27cm 1.27cm 1.27cm;
+                                mso-header-margin: 0.5in;
+                                mso-footer-margin: 0.5in;
+                                mso-header: h1;
+                                mso-footer: f1;
+                            }
+                            div.Section1 { page: Section1; }
+                            
+                            body { font-family: 'Times New Roman', serif; font-size: 11pt; line-height: 1.15; }
+                            table { border-collapse: collapse; width: 100%; table-layout: fixed; border: 1px solid #000; }
+                            td { border: 1px solid #000; padding: 5pt; vertical-align: top; word-wrap: break-word; }
+                            
+                            div#h1 { margin: 0; padding: 0; font-size: 9pt; text-align: center; border-bottom: 1px solid #ddd; }
+                            div#f1 { margin: 0; padding: 0; font-size: 9pt; text-align: center; border-top: 1px solid #ddd; }
+                        </style>
+                    </head>
+                    <body>
+                        <div class="Section1">
+                            <div style='mso-element:header' id=h1>${headerContent || '<p>Docufai Header</p>'}</div>
+                            ${bodyContent}
+                            <div style='mso-element:footer' id=f1>${footerContent || '<p>Page <span style="mso-field-code: PAGE "></span> of <span style="mso-field-code: NUMPAGES "></span></p>'}</div>
+                        </div>
+                    </body>
+                    </html>
+                `;
+
+                document.getElementById('outputFrame').srcdoc = wordHTML;
                 document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 document.getElementById('totalCredits').innerText = data.total_credits;
                 document.getElementById('displayCounter').innerText = data.updated_count;
@@ -234,16 +297,13 @@
             }
         };
 
-        rechargeBtn.onclick = () => {
-            window.location.href = "/api/pay?userId=" + localStorage.getItem('doc_user_id');
-        };
-
+        rechargeBtn.onclick = () => window.location.href = "/api/pay?userId=" + localStorage.getItem('doc_user_id');
+        
         document.getElementById('downloadBtn').onclick = function() {
             const frame = document.getElementById('outputFrame');
-            const frameDoc = frame.contentDocument || frame.contentWindow.document;
-            const content = frameDoc.getElementById('main-content').innerHTML;
-            const converted = htmlDocx.asBlob("<!DOCTYPE html><html><body>" + content + "</body></html>");
-            saveAs(converted, 'Docufai_Export.docx');
+            const content = frame.contentDocument.documentElement.outerHTML;
+            const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
+            saveAs(blob, 'Docufai_Replica.doc');
         };
     </script>
 </body>
