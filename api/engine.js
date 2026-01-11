@@ -30,7 +30,7 @@ export default async function handler(req, res) {
         const keys = process.env.GROQ_KEYS ? process.env.GROQ_KEYS.split(',') : [];
         if (keys.length === 0) throw new Error("GROQ_KEYS not found in environment variables");
         
-        const MODEL_ID = process.env.CURRENT_MODEL || "meta-llama/llama-3.2-90b-vision-preview"; // ভিশন মডেল নিশ্চিত করা হলো
+        const MODEL_ID = process.env.CURRENT_MODEL || "llama-3.2-90b-vision-preview"; // ভিশন মডেল নিশ্চিত করা হলো
 
         // ৪. মাস্টার প্রম্পট (সব ফিচার একত্রিত করা হয়েছে)
         const MASTER_PROMPT = `
