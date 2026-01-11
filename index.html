@@ -39,7 +39,6 @@
                 <span>Unlock Credits</span>
                 <span>⚡</span>
             </button>
-
             <div class="h-8 w-[1px] bg-slate-200"></div>
             <div class="text-right">
                 <p class="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-right">Credits</p>
@@ -56,7 +55,6 @@
         <aside class="lg:col-span-1 space-y-6">
             <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
                 <h3 class="font-extrabold text-slate-800 mb-5 italic tracking-tight uppercase text-xs">📁 Secure Upload</h3>
-                
                 <div id="dropZone" class="border-2 border-dashed border-slate-300 rounded-2xl p-10 text-center cursor-pointer bg-slate-50 hover:border-indigo-500 transition-all relative">
                     <input type="file" id="fileInput" accept="image/*,application/pdf" class="hidden">
                     <div id="dropText">
@@ -73,13 +71,12 @@
                 </div>
 
                 <div id="previewContainer" class="hidden mt-4">
-                    <p class="text-[9px] font-bold text-slate-400 uppercase mb-2 italic">Select Page Preview</p>
+                    <p class="text-[9px] font-bold text-slate-400 uppercase mb-2 italic">Select Preview</p>
                     <div id="previewScroll" class="preview-scroll flex space-x-2 overflow-x-auto pb-2"></div>
                 </div>
 
                 <button id="processBtn" class="w-full mt-8 bg-indigo-600 hover:bg-indigo-700 text-white font-black py-4 rounded-xl shadow-xl transition-all active:scale-95">CONVERT PAGE ⚡</button>
             </div>
-
             <div id="statusBox" class="hidden bg-white p-6 rounded-3xl border border-slate-200 shadow-sm text-center">
                 <div class="spinner w-10 h-10 border-4 border-slate-200 mx-auto mb-4 rounded-full"></div>
                 <p id="statusMsg" class="text-[10px] font-black text-slate-600 tracking-[0.2em] uppercase italic">Processing...</p>
@@ -111,7 +108,6 @@
             localStorage.setItem('doc_user_id', 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase());
         }
 
-        // DOM Elements
         const fileInput = document.getElementById('fileInput');
         const dropZone = document.getElementById('dropZone');
         const processBtn = document.getElementById('processBtn');
@@ -123,8 +119,8 @@
 
         // Drag & Drop
         dropZone.onclick = () => fileInput.click();
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-            dropZone.addEventListener(eventName, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+            dropZone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
         });
         dropZone.addEventListener('dragover', () => dropZone.classList.add('drop-active'));
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drop-active'));
@@ -184,7 +180,7 @@
             return canvas.toDataURL('image/png').split(',')[1];
         }
 
-        // MAIN PROCESS FUNCTION
+        // MAIN PROCESS
         processBtn.onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return alert("ফাইল সিলেক্ট করুন!");
@@ -204,83 +200,61 @@
 
                 const data = await response.json();
 
-                if (response.status === 402) {
-                    rechargeBtn.classList.remove('hidden');
-                    alert("আপনার ক্রেডিট শেষ! Unlock Credits বাটনে ক্লিক করুন।");
+                // ERROR HANDLING
+                if (!response.ok || !data.choices) {
+                    if (response.status === 402) {
+                        rechargeBtn.classList.remove('hidden');
+                        alert("আপনার ক্রেডিট শেষ! Unlock Credits বাটনে ক্লিক করুন।");
+                    } else {
+                        alert("Error: " + (data.error || "এপিআই থেকে রেসপন্স পাওয়া যায়নি।"));
+                    }
                     document.getElementById('statusBox').classList.add('hidden');
                     return;
                 }
 
                 let aiContent = data.choices[0].message.content.replace(/```html|```/g, "").trim();
 
-                // 1. EXTRACT HEADER/FOOTER (Smart Logic)
+                // 1. EXTRACT HEADER/FOOTER
                 let headerContent = "";
                 let footerContent = "";
                 let bodyContent = aiContent;
 
                 const headerMatch = aiContent.match(/<header>(.*?)<\/header>/s);
-                if (headerMatch) {
-                    headerContent = headerMatch[1];
-                    bodyContent = bodyContent.replace(headerMatch[0], "");
-                }
+                if (headerMatch) { headerContent = headerMatch[1]; bodyContent = bodyContent.replace(headerMatch[0], ""); }
                 const footerMatch = aiContent.match(/<footer>(.*?)<\/footer>/s);
-                if (footerMatch) {
-                    footerContent = footerMatch[1];
-                    bodyContent = bodyContent.replace(footerMatch[0], "");
-                }
+                if (footerMatch) { footerContent = footerMatch[1]; bodyContent = bodyContent.replace(footerMatch[0], ""); }
 
-                // 2. MS WORD XML TEMPLATE (With Compact Font Size)
+                // 2. MS WORD XML TEMPLATE (EXACT REPLICA)
                 const wordHTML = `
                     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
                     <head>
                         <meta charset="utf-8">
-                        <title>Docufai Replica</title>
                         <script>
                             window.MathJax = { tex: { inlineMath: [['$', '$']] }, svg: { fontCache: 'global' } };
                         <\/script>
                         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async><\/script>
-                        
-                        <xml>
-                            <w:WordDocument>
-                                <w:View>Print</w:View>
-                                <w:Zoom>100</w:Zoom>
-                                <w:DoNotOptimizeForBrowser/>
-                            </w:WordDocument>
-                        </xml>
-
+                        <xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom></w:WordDocument></xml>
                         <style>
-                            /* PAGE SETUP (A4 Exact Layout) */
                             @page {
                                 size: 21cm 29.7cm;
                                 margin: 1.27cm 1.27cm 1.27cm 1.27cm;
-                                mso-page-orientation: portrait;
                                 mso-header: url("docufai_header.htm") h1;
                                 mso-footer: url("docufai_footer.htm") f1;
                             }
-                            @page Section1 {
-                                size: 21cm 29.7cm;
-                                margin: 1.27cm 1.27cm 1.27cm 1.27cm;
-                                mso-header-margin: 0.5in;
-                                mso-footer-margin: 0.5in;
-                                mso-header: h1;
-                                mso-footer: f1;
-                            }
+                            @page Section1 { mso-header-margin:0.5in; mso-footer-margin:0.5in; mso-header:h1; mso-footer:f1; }
                             div.Section1 { page: Section1; }
-                            
-                            /* COMPACT STYLES FOR 1-PAGE FIT */
                             body { font-family: 'Times New Roman', serif; font-size: 10.5pt; line-height: 1.15; }
                             table { border-collapse: collapse; width: 100%; table-layout: fixed; border: 1px solid #000; }
                             td { border: 1px solid #000; padding: 5pt; vertical-align: top; word-wrap: break-word; }
-                            
-                            /* HEADER/FOOTER STYLES */
-                            div#h1 { margin: 0; padding: 0; font-size: 9pt; text-align: center; border-bottom: 1px solid #ddd; }
-                            div#f1 { margin: 0; padding: 0; font-size: 9pt; text-align: center; border-top: 1px solid #ddd; }
+                            div#h1 { font-size: 9pt; text-align: center; border-bottom: 1px solid #ddd; }
+                            div#f1 { font-size: 9pt; text-align: center; border-top: 1px solid #ddd; }
+                            .math-tex { display: inline-block; }
                         </style>
                     </head>
                     <body>
                         <div class="Section1">
                             <div style='mso-element:header' id=h1>${headerContent || '<p>Docufai Header</p>'}</div>
-                            ${bodyContent}
+                            <div id="main-body">${bodyContent}</div>
                             <div style='mso-element:footer' id=f1>${footerContent || '<p>Page <span style="mso-field-code: PAGE "></span> of <span style="mso-field-code: NUMPAGES "></span></p>'}</div>
                         </div>
                     </body>
@@ -307,11 +281,7 @@
         document.getElementById('downloadBtn').onclick = function() {
             const frame = document.getElementById('outputFrame');
             const content = frame.contentDocument.documentElement.outerHTML;
-            
-            // Blob for Word Document
-            const blob = new Blob(['\ufeff', content], {
-                type: 'application/msword'
-            });
+            const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
             saveAs(blob, 'Docufai_Replica.doc');
         };
     </script>
