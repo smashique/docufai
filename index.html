@@ -16,7 +16,6 @@
     
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=Hind+Siliguri:wght@400;700&display=swap');
-        
         body { font-family: 'Inter', 'Hind Siliguri', sans-serif; scroll-behavior: smooth; }
         .glass { background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.3); }
         .progress-line { height: 4px; width: 0%; background: linear-gradient(to right, #6366f1, #a855f7); transition: width 0.4s ease; }
@@ -114,14 +113,9 @@
     <script>
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        // PWA Setup
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js'); });
-        }
-
-        if (!localStorage.getItem('doc_user_id')) {
-            localStorage.setItem('doc_user_id', 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase());
-        }
+        // PWA & Storage Init
+        if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('/sw.js'); }); }
+        if (!localStorage.getItem('doc_user_id')) { localStorage.setItem('doc_user_id', 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase()); }
 
         const fileInput = document.getElementById('fileInput');
         const dropZone = document.getElementById('dropZone');
@@ -134,14 +128,46 @@
         const topProgress = document.getElementById('topProgress');
         const outFrame = document.getElementById('outputFrame');
 
-        // Drag & Drop
+        // --- ২. কাজের মান বাড়াতে ইমেজ শার্পেনার (AI-এর কাজ কমাতে) ---
+        async function sharpenForAI(canvas) {
+            const ctx = canvas.getContext('2d');
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const d = imgData.data;
+            for (let i = 0; i < d.length; i += 4) {
+                const v = (d[i] * 0.3 + d[i+1] * 0.59 + d[i+2] * 0.11); // Grayscale
+                d[i] = d[i+1] = d[i+2] = v > 128 ? v + 25 : v - 25; // Contrast Boost
+            }
+            ctx.putImageData(imgData, 0, 0);
+        }
+
+        // --- ৪. ফর্মেটিং ইঞ্জিন (আলাদা ফাংশন হিসেবে রাখা হলো) ---
+        function applyEliteFormatting(body, header = "", footer = "") {
+            return `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head><meta charset="utf-8">
+                    <script>window.MathJax = { tex: { inlineMath: [['$', '$']] } };<\/script>
+                    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async><\/script>
+                    <style>
+                        @page { size: 21cm 29.7cm; margin: 1.27cm; mso-header: url("h1") h1; mso-footer: url("f1") f1; }
+                        body { font-family: 'Times New Roman', 'Siyam Rupali', serif; font-size: 10.5pt; line-height: 1.15; padding: 20px; }
+                        table { border-collapse: collapse; width: 100%; border: 1px solid #000; }
+                        td { border: 1px solid #000; padding: 5pt; vertical-align: top; }
+                        div#h1 { font-size: 9pt; text-align: center; border-bottom: 1px solid #ddd; }
+                        div#f1 { font-size: 9pt; text-align: center; border-top: 1px solid #ddd; }
+                    </style>
+                </head>
+                <body>
+                    <div style='mso-element:header' id=h1>${header || '<p>Docufai Pro Architecture</p>'}</div>
+                    <div id="editable-body">${body}</div>
+                    <div style='mso-element:footer' id=f1>${footer || '<p>Page <span style="mso-field-code: PAGE "></span> of <span style="mso-field-code: NUMPAGES "></span></p>'}</div>
+                </body></html>
+            `;
+        }
+
+        // File Selection Logic
         dropZone.onclick = () => fileInput.click();
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
-            dropZone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); }, false);
-        });
-        dropZone.addEventListener('drop', (e) => {
-            if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; handleFileSelect(fileInput.files[0]); }
-        });
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => { dropZone.addEventListener(ev, (e) => { e.preventDefault(); e.stopPropagation(); }, false); });
+        dropZone.addEventListener('drop', (e) => { if (e.dataTransfer.files.length) { fileInput.files = e.dataTransfer.files; handleFileSelect(fileInput.files[0]); } });
         fileInput.onchange = () => { if (fileInput.files[0]) handleFileSelect(fileInput.files[0]); };
 
         async function handleFileSelect(file) {
@@ -184,23 +210,34 @@
             const viewport = page.getViewport({ scale: 2 });
             canvas.height = viewport.height; canvas.width = viewport.width;
             await page.render({ canvasContext: context, viewport: viewport }).promise;
+            
+            // ১. এআই-এর কাজ কমাতে ইমেজ প্রসেসিং রান করা
+            await sharpenForAI(canvas);
+            
             return canvas.toDataURL('image/png').split(',')[1];
         }
 
-        // PROCESS
+        // MAIN ARCHITECTURE PROCESS
         processBtn.onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return alert("Select a file first!");
-            
-            // Haptic Feedback
             if (navigator.vibrate) navigator.vibrate(50);
 
             document.getElementById('statusBox').classList.remove('hidden');
             topProgress.style.width = "40%";
 
             try {
-                let b64Data = file.type === "application/pdf" ? await getPageAsB64(file, parseInt(targetPageInput.value)) : await new Promise(res => {
-                    const r = new FileReader(); r.onload = () => res(r.result.split(',')[1]); r.readAsDataURL(file);
+                let b64Data = file.type === "application/pdf" ? await getPageAsB64(file, parseInt(targetPageInput.value)) : await new Promise(async res => {
+                    const r = new FileReader(); r.onload = async () => {
+                        const tempImg = new Image(); tempImg.src = r.result;
+                        tempImg.onload = async () => {
+                            const canvas = document.getElementById('pdfCanvas');
+                            canvas.width = tempImg.width; canvas.height = tempImg.height;
+                            const ctx = canvas.getContext('2d'); ctx.drawImage(tempImg, 0, 0);
+                            await sharpenForAI(canvas); // ইমেজ এনহ্যান্সমেন্ট
+                            res(canvas.toDataURL('image/png').split(',')[1]);
+                        };
+                    }; r.readAsDataURL(file);
                 });
 
                 const response = await fetch("/api/engine", {
@@ -210,52 +247,32 @@
                 });
 
                 const data = await response.json();
-
                 if (!response.ok || !data.choices) {
-                    if (response.status === 402) { rechargeBtn.classList.remove('hidden'); alert("Credits exhausted!"); }
+                    if (response.status === 402) alert("Credits exhausted!");
                     else alert("Error: " + (data.error || "API Failed"));
                     resetUI(); return;
                 }
 
-                // Haptic Success
                 if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
                 topProgress.style.width = "100%";
 
-                let aiContent = data.choices[0].message.content.replace(/```html|```/g, "").trim();
+                let aiRawContent = data.choices[0].message.content.replace(/```html|```/g, "").trim();
 
-                // Build Final MS Word XML Structure
-                let headerContent = "", footerContent = "", bodyContent = aiContent;
-                const hMatch = aiContent.match(/<header>(.*?)<\/header>/s);
-                if (hMatch) { headerContent = hMatch[1]; bodyContent = bodyContent.replace(hMatch[0], ""); }
-                const fMatch = aiContent.match(/<footer>(.*?)<\/footer>/s);
-                if (fMatch) { footerContent = fMatch[1]; bodyContent = bodyContent.replace(fMatch[0], ""); }
+                // ৩. প্রম্পট অনুযায়ী ডাটা ক্লিন করা (হেডার/ফুটার আলাদা করা)
+                let header = "", footer = "", body = aiRawContent;
+                const hMatch = aiRawContent.match(/<header>(.*?)<\/header>/s);
+                if (hMatch) { header = hMatch[1]; body = body.replace(hMatch[0], ""); }
+                const fMatch = aiRawContent.match(/<footer>(.*?)<\/footer>/s);
+                if (fMatch) { footer = fMatch[1]; body = body.replace(fMatch[0], ""); }
 
-                const wordHTML = `
-                    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-                    <head><meta charset="utf-8">
-                        <script>window.MathJax = { tex: { inlineMath: [['$', '$']] } };<\/script>
-                        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async><\/script>
-                        <style>
-                            @page { size: 21cm 29.7cm; margin: 1.27cm; mso-header: url("h1") h1; mso-footer: url("f1") f1; }
-                            body { font-family: 'Times New Roman', serif; font-size: 10.5pt; line-height: 1.15; padding: 20px; }
-                            table { border-collapse: collapse; width: 100%; border: 1px solid #000; }
-                            td { border: 1px solid #000; padding: 5pt; vertical-align: top; }
-                            div#h1 { font-size: 9pt; text-align: center; border-bottom: 1px solid #ddd; }
-                            div#f1 { font-size: 9pt; text-align: center; border-top: 1px solid #ddd; }
-                        </style>
-                    </head>
-                    <body>
-                        <div style='mso-element:header' id=h1>${headerContent || '<p>Docufai Pro Architecture</p>'}</div>
-                        <div id="editable-body">${bodyContent}</div>
-                        <div style='mso-element:footer' id=f1>${footerContent || '<p>Page <span style="mso-field-code: PAGE "></span> of <span style="mso-field-code: NUMPAGES "></span></p>'}</div>
-                    </body></html>
-                `;
+                // ৪. আলাদা ফর্মেটিং ফাইল (ফাংশন) থেকে আউটপুট তৈরি
+                const finalHTML = applyEliteFormatting(body, header, footer);
 
                 document.getElementById('welcomeScreen').classList.add('hidden');
                 outFrame.classList.remove('hidden');
-                outFrame.srcdoc = wordHTML;
+                outFrame.srcdoc = finalHTML;
 
-                // Live Editor Enable
+                // Live Editor & Copy Setup
                 outFrame.onload = () => {
                     outFrame.contentDocument.body.contentEditable = 'true';
                     outFrame.contentDocument.body.style.outline = 'none';
@@ -270,20 +287,10 @@
             } catch (err) { alert(err.message); resetUI(); }
         };
 
-        function resetUI() {
-            document.getElementById('statusBox').classList.add('hidden');
-            setTimeout(() => topProgress.style.width = "0%", 1000);
-        }
-
+        function resetUI() { document.getElementById('statusBox').classList.add('hidden'); setTimeout(() => topProgress.style.width = "0%", 1000); }
         rechargeBtn.onclick = () => window.location.href = "/api/pay?userId=" + localStorage.getItem('doc_user_id');
-        
-        document.getElementById('copyBtn').onclick = () => {
-            const content = outFrame.contentDocument.body.innerHTML;
-            navigator.clipboard.writeText(content);
-            alert("HTML Copied to Clipboard!");
-        };
-
-        document.getElementById('downloadBtn').onclick = function() {
+        document.getElementById('copyBtn').onclick = () => { navigator.clipboard.writeText(outFrame.contentDocument.body.innerHTML); alert("HTML Copied!"); };
+        document.getElementById('downloadBtn').onclick = function() { 
             const content = outFrame.contentDocument.documentElement.outerHTML;
             const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
             saveAs(blob, 'Docufai_Pro_Export.doc');
