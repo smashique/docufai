@@ -1,9 +1,8 @@
 // api/engine.js - The Modular Connection Bridge
 
 import { createClient } from '@supabase/supabase-js';
-import { ELITE_PROMPT } from './prompts.js'; // ডেডিকেটেড প্রম্পট ইম্পোর্ট
+import { ELITE_PROMPT } from './prompts.js'; 
 
-// সুপাবেস ইনিশিয়ালাইজেশন
 const supabase = createClient(
     process.env.SUPABASE_URL,
     process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -28,16 +27,15 @@ export default async function handler(req, res) {
             .single();
 
         if (userError || !user) {
-            // নতুন ইউজার হলে ১০ ক্রেডিট দিয়ে এন্ট্রি করা
             await supabase.from('users').insert([{ id: userId, total_credits: 10, updated_count: 0 }]);
             return res.status(200).json({ info: "First time user, credits initialized. Please retry." });
         }
 
         if (user.total_credits - user.updated_count <= 0) {
-            return res.status(402).json({ error: "Credits exhausted. Please recharge." }); //
+            return res.status(402).json({ error: "Credits exhausted. Please recharge." });
         }
 
-        // ২. গ্রক এপিআই কল (AI Brain - Llama 4 Scout)
+        // ২. গ্রক এপিআই কল (AI Brain - Stable Vision Model Updated)
         const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -45,12 +43,13 @@ export default async function handler(req, res) {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                model: "meta-llama/llama-4-scout-17b-16e-instruct", // এলিট ভিশন মডেল
+                // মডেল আপডেট করা হয়েছে: llama-3.2-11b-vision-preview
+                model: "llama-3.2-11b-vision-preview", 
                 messages: [
                     {
                         role: "user",
                         content: [
-                            { type: "text", text: ELITE_PROMPT }, // প্রম্পট ফাইল থেকে লোড
+                            { type: "text", text: ELITE_PROMPT },
                             {
                                 type: "image_url",
                                 image_url: { url: `data:image/png;base64,${imageB64}` }
@@ -65,8 +64,13 @@ export default async function handler(req, res) {
 
         const aiData = await groqResponse.json();
 
+        // এপিআই এরর বা খালি রেসপন্স হ্যান্ডলিং
         if (!groqResponse.ok) {
-            throw new Error(aiData.error?.message || "AI processing failed");
+            throw new Error(aiData.error?.message || "Groq API processing failed");
+        }
+
+        if (!aiData.choices || aiData.choices.length === 0) {
+            throw new Error("AI returned an empty response. Please try with a clearer image.");
         }
 
         // ৩. ক্রেডিট আপডেট (Billing Automation)
