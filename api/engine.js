@@ -1,11 +1,11 @@
 // api/engine.js
 import { createClient } from '@supabase/supabase-js';
-import { ELITE_MATH_PROMPT } from './prompts.js'; // নিশ্চিত করুন ফাইলটি api ফোল্ডারেই আছে
+import { ELITE_MATH_PROMPT } from './prompts.js'; // Ensure file exists in the same folder
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default async function handler(req, res) {
-    // ক্র্যাশ করলেও যেন ব্রাউজার JSON পায় তা নিশ্চিত করা
+    // প্রথমেই হেডার সেট করা যাতে ক্র্যাশ করলেও JSON রিটার্ন হয়
     res.setHeader('Content-Type', 'application/json');
 
     if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
@@ -14,37 +14,37 @@ export default async function handler(req, res) {
     const userId = userInfo?.id;
 
     if (!userId || !imageB64) {
-        return res.status(400).json({ error: "Missing User ID or Image Data" });
+        return res.status(400).json({ error: "Missing required data: ID or Image" });
     }
 
     try {
-        // ১. ডাটাবেস থেকে ইউজার চেক
+        // ১. ডাটাবেস কানেকশন এবং ইউজার চেক
         let { data: user, error: dbError } = await supabase.from('users').select('*').eq('id', userId).single();
         
-        // যদি ইউজার না থাকে (PGRST116 মানে single রিকোয়েস্টে ডাটা নেই)
         if (dbError && dbError.code === 'PGRST116') {
+            // নতুন ইউজার তৈরি
             const { data: newUser, error: insError } = await supabase.from('users')
                 .insert([{ id: userId, total_credits: 10, updated_count: 0 }])
                 .select().single();
             if (insError) throw new Error("DB Insert Error: " + insError.message);
             user = newUser;
         } else if (dbError) {
-            throw new Error("DB Fetch Error: " + dbError.message);
+            throw new Error("Supabase Connection Error: " + dbError.message);
         }
 
-        // ২. ক্রেডিট চেক
+        // ২. ক্রেডিট লিমিট চেক
         if (user.total_credits - user.updated_count <= 0) {
-            return res.status(402).json({ error: "Credits exhausted!" });
+            return res.status(402).json({ error: "Credits exhausted! Please recharge." });
         }
 
-        // ৩. Groq Keys হ্যান্ডলিং
+        // ৩. এপিআই কী রোটেশন
         const keysString = process.env.GROQ_KEYS;
-        if (!keysString) throw new Error("GROQ_KEYS is missing in Vercel settings.");
+        if (!keysString) throw new Error("Server Error: GROQ_KEYS not found in Vercel.");
         
         const keyPool = keysString.split(',').map(k => k.trim()).filter(k => k.length > 0);
         const selectedKey = keyPool[Math.floor(Math.random() * keyPool.length)];
 
-        // ৪. এআই কল (Llama 4 Scout)
+        // ৪. Groq এআই কল (Llama 4 Scout)
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: { 
@@ -61,11 +61,10 @@ export default async function handler(req, res) {
             })
         });
 
-        // রেসপন্স চেক
         const aiData = await groqRes.json();
-        if (!groqRes.ok) throw new Error(aiData.error?.message || "Groq API Error");
+        if (!groqRes.ok) throw new Error(aiData.error?.message || "Groq API Process Failed.");
 
-        // ৫. ক্রেডিট আপডেট
+        // ৫. সফল হলে ক্রেডিট আপডেট
         const newCount = user.updated_count + 1;
         await supabase.from('users').update({ updated_count: newCount }).eq('id', userId);
 
@@ -76,8 +75,7 @@ export default async function handler(req, res) {
         });
 
     } catch (err) {
-        console.error("Critical Engine Error:", err.message);
-        // নিশ্চিত করা হচ্ছে যে ক্যাচ ব্লক থেকে শুধু JSON ফেরত যায়
-        return res.status(500).json({ error: "Engine Crash: " + err.message });
+        // এররটি সরাসরি JSON হিসেবে রিটার্ন করা হচ্ছে
+        return res.status(500).json({ error: "Engine Crash Report: " + err.message });
     }
 }
