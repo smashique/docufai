@@ -1,6 +1,6 @@
-// api/formats.js - Universal Document Engine
+// api/formats.js
 
-// ১. ইমেজ শার্পনার: এআই-এর কাজ কমাতে ইমেজ এনহ্যান্সমেন্ট
+// ইমেজ শার্পনার: এআই-এর জন্য ছবি পরিষ্কার করা
 export const sharpenForAI = (canvas) => {
     const ctx = canvas.getContext('2d');
     const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -12,7 +12,7 @@ export const sharpenForAI = (canvas) => {
     ctx.putImageData(imgData, 0, 0);
 };
 
-// ২. এলিট ওয়ার্ড টেমপ্লেট: পিক্সেল-পারফেক্ট রেপ্লিকা লেআউট
+// ইউনিভার্সাল ওয়ার্ড টেমপ্লেট
 export const getEliteWordTemplate = (body, header = "", footer = "") => {
     return `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -21,19 +21,19 @@ export const getEliteWordTemplate = (body, header = "", footer = "") => {
         <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async><\/script>
         <style>
             @page { size: 21cm 29.7cm; margin: 1.27cm; mso-header: url("h1") h1; mso-footer: url("f1") f1; }
-            body { font-family: 'Times New Roman', 'Siyam Rupali', serif; font-size: 10.5pt; line-height: 1.15; }
-            .grid-row { display: table; width: 100%; table-layout: fixed; margin-bottom: 5pt; }
+            body { font-family: 'Times New Roman', 'Siyam Rupali', serif; font-size: 10.5pt; line-height: 1.2; color: #000; }
+            .grid-row { display: table; width: 100%; table-layout: fixed; margin-bottom: 8pt; }
             .col-item { display: table-cell; vertical-align: top; padding: 5pt; }
-            .floating-box { border: 1.5pt solid #000; padding: 8pt; margin: 10pt 0; }
+            .floating-box { border: 1.5pt solid #000; padding: 10pt; margin: 10pt 0; }
             table { border-collapse: collapse; width: 100%; border: 1pt solid #000; }
             td { border: 1pt solid #000; padding: 4pt; vertical-align: top; }
-            div#h1 { font-size: 9pt; text-align: center; border-bottom: 1px solid #ddd; }
-            div#f1 { font-size: 9pt; text-align: center; border-top: 1px solid #ddd; }
+            #h1, #f1 { font-size: 9pt; text-align: center; border-bottom: 1px solid #ddd; }
+            [dir="rtl"] { text-align: right; }
         </style>
     </head>
     <body>
         <div class="Section1">
-            <header id="h1" style='mso-element:header'>${header || 'Docufai Pro Architecture'}</header>
+            <header id="h1" style='mso-element:header'>${header || 'Docufai Pro Elite Architecture'}</header>
             <main>${body}</main>
             <footer id="f1" style='mso-element:footer'>Page <span style="mso-field-code: PAGE "></span></footer>
         </div>
