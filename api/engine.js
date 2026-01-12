@@ -42,7 +42,7 @@ export default async function handler(req, res) {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                // সঠিক মডেল আইডি: llama-3.2-11b-vision-preview
+                // মডেল আপডেট: llama-3.2-11b-vision-preview
                 model: "llama-3.2-11b-vision-preview", 
                 messages: [
                     {
@@ -63,16 +63,16 @@ export default async function handler(req, res) {
 
         const aiData = await groqResponse.json();
 
-        // এরর চেক: এপিআই থেকে সরাসরি এরর আসলে তা হ্যান্ডেল করা
+        // এপিআই লেভেলে কোনো এরর থাকলে তা ধরা
         if (!groqResponse.ok) {
             return res.status(groqResponse.status).json({ 
                 error: aiData.error?.message || "Groq API Error: " + groqResponse.statusText 
             });
         }
 
-        // আউটপুট চেক: choices না থাকলে এরর দেওয়া
+        // আউটপুট চেক: choices না থাকলে এরর মেসেজ দেওয়া
         if (!aiData.choices || aiData.choices.length === 0) {
-            return res.status(500).json({ error: "AI returned an empty response. Check if image size is too large." });
+            return res.status(500).json({ error: "AI returned an empty response. Try resizing the image." });
         }
 
         // ৩. ক্রেডিট আপডেট
