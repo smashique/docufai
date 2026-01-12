@@ -1,11 +1,13 @@
 // api/engine.js
 import { createClient } from '@supabase/supabase-js';
+import { ELITE_MATH_PROMPT } from './prompts.js'; // আলাদা প্রম্পট ফাইল থেকে লোড হচ্ছে
 
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: "POST required" });
     
+    // ১. Multi-Key Rotation
     const keysString = process.env.GROQ_KEYS;
     const keyPool = keysString.split(',').map(k => k.trim());
     const selectedKey = keyPool[Math.floor(Math.random() * keyPool.length)];
@@ -13,14 +15,17 @@ export default async function handler(req, res) {
     const { imageB64, userInfo } = req.body;
 
     try {
-        // High-Precision Prompt for Math Columns & Diagrams
+        // ২. Groq API Call with Llama 4 Scout
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
-            headers: { "Authorization": `Bearer ${selectedKey}`, "Content-Type": "application/json" },
+            headers: { 
+                "Authorization": `Bearer ${selectedKey}`, 
+                "Content-Type": "application/json" 
+            },
             body: JSON.stringify({
                 model: "meta-llama/llama-4-scout-17b-16e-instruct", 
                 messages: [{ role: "user", content: [
-                    { type: "text", text: "ACT AS AN ELITE EXAM ARCHITECT. RECONSTRUCT THIS MATH MCQ PAPER. 1. USE A 2-COLUMN CSS GRID LAYOUT. 2. USE LATEX FOR ALL MATH/TRIGONOMETRY. 3. FOR DIAGRAMS/GRAPHS, CREATE A PLACEHOLDER BOX WITH A TEXT DESCRIPTION OF THE GEOMETRY. 4. ENSURE TABLES ARE RENDERED AS PROPER HTML TABLES." },
+                    { type: "text", text: ELITE_MATH_PROMPT },
                     { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageB64}` } }
                 ]}],
                 temperature: 0.1
@@ -28,6 +33,9 @@ export default async function handler(req, res) {
         });
 
         const aiData = await groqRes.json();
+        if (!groqRes.ok) throw new Error(aiData.error?.message || "AI Error");
+
+        // ৩. ক্রেডিট আপডেট লজিক
         const { data: user } = await supabase.from('users').select('*').eq('id', userInfo.id).single();
         const newCount = (user?.updated_count || 0) + 1;
         await supabase.from('users').update({ updated_count: newCount }).eq('id', userInfo.id);
@@ -39,6 +47,6 @@ export default async function handler(req, res) {
         });
 
     } catch (err) {
-        return res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: "Engine Error: " + err.message });
     }
 }
