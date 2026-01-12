@@ -12,7 +12,7 @@
         .progress-line { height: 4px; width: 0%; background: #6366f1; transition: width 0.4s; position: fixed; top: 0; left: 0; z-index: 100; }
         #previewScroll::-webkit-scrollbar { height: 4px; }
         #previewScroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
-        .page-thumb.active { border: 3px solid #6366f1; transform: scale(0.98); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .page-thumb.active { border: 3px solid #6366f1; transform: scale(0.98); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -22,7 +22,7 @@
         <div class="font-black italic text-xl">DOCUFAI <span class="text-indigo-600 text-[10px] uppercase block -mt-1">Pro</span></div>
         <div class="flex items-center space-x-4">
             <span id="remCredits" class="font-black text-indigo-600 italic">10</span>
-            <button id="rechargeBtn" class="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase shadow-lg transition-all active:scale-95">Recharge ⚡</button>
+            <button id="rechargeBtn" class="bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-[10px] font-black uppercase shadow-lg">Recharge ⚡</button>
         </div>
     </nav>
 
@@ -35,25 +35,25 @@
                 </div>
                 <div id="pdfControls" class="hidden mt-6 space-y-4">
                     <div class="flex justify-between items-center bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                        <div><p class="text-[9px] font-black text-indigo-400 uppercase">Page</p><input type="number" id="targetPage" value="1" class="bg-transparent font-black text-indigo-700 outline-none w-full text-lg"></div>
+                        <div><p class="text-[9px] font-black text-indigo-400 uppercase">Page</p><input type="number" id="targetPage" value="1" min="1" class="bg-transparent font-black text-indigo-700 outline-none w-full text-lg"></div>
                         <div class="text-right"><p class="text-[9px] font-black text-indigo-400 uppercase">Total</p><p id="totalPages" class="font-black text-indigo-700 text-lg">0</p></div>
                     </div>
                     <div id="previewScroll" class="flex space-x-3 overflow-x-auto pb-4 scroll-smooth"></div>
                 </div>
-                <button id="processBtn" class="w-full mt-6 bg-indigo-600 text-white font-black py-4 rounded-xl active:scale-95 transition-all shadow-xl">ARCHITECT NOW ⚡</button>
+                <button id="processBtn" class="w-full mt-6 bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">ARCHITECT NOW ⚡</button>
             </div>
             <div id="statusBox" class="hidden bg-white p-6 rounded-2xl text-center shadow-md">
                 <div class="w-6 h-6 border-t-2 border-indigo-600 rounded-full animate-spin mx-auto mb-2"></div>
-                <p class="text-[10px] font-black uppercase italic text-slate-600 tracking-widest">Engineering Structure...</p>
+                <p class="text-[10px] font-black uppercase italic text-slate-600">Engineering Structure...</p>
             </div>
         </aside>
 
         <section class="lg:col-span-8">
             <div class="bg-slate-900 rounded-t-2xl px-6 py-4 flex justify-between items-center shadow-xl">
-                <span class="text-slate-500 text-[9px] font-mono tracking-widest uppercase italic">Architect Terminal v2.0</span>
+                <span class="text-slate-500 text-[9px] font-mono tracking-widest uppercase">DNA Terminal v2.0</span>
                 <div class="flex space-x-2">
                     <button id="copyBtn" class="hidden bg-slate-700 text-white text-[9px] px-3 py-1.5 rounded-lg">COPY</button>
-                    <button id="downloadBtn" class="hidden bg-emerald-600 text-white text-[9px] px-3 py-1.5 rounded-lg shadow-lg uppercase font-bold">Download DOCX</button>
+                    <button id="downloadBtn" class="hidden bg-emerald-600 text-white text-[9px] px-3 py-1.5 rounded-lg shadow-lg">DOCX</button>
                 </div>
             </div>
             <div class="bg-white rounded-b-2xl border min-h-[750px] overflow-hidden relative shadow-2xl">
@@ -98,7 +98,7 @@
             for (let i = 1; i <= Math.min(pdf.numPages, 15); i++) {
                 const page = await pdf.getPage(i);
                 const canvas = document.createElement('canvas');
-                canvas.className = `page-thumb shrink-0 border-2 border-transparent rounded-lg cursor-pointer w-20 bg-white transition-all hover:border-indigo-300`;
+                canvas.className = `page-thumb shrink-0 border-2 border-transparent rounded-lg cursor-pointer w-20 bg-white transition-all`;
                 const viewport = page.getViewport({ scale: 0.15 });
                 canvas.width = viewport.width; canvas.height = viewport.height;
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
@@ -114,8 +114,6 @@
         document.getElementById('processBtn').onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return alert("Select file first!");
-            if (navigator.vibrate) navigator.vibrate(50);
-            
             topProgress.style.width = "40%";
             document.getElementById('statusBox').classList.remove('hidden');
             
@@ -145,9 +143,13 @@
                 });
 
                 const data = await res.json();
-                if (!res.ok || !data.choices?.[0]) throw new Error(data.error || "AI Error");
+                
+                // এরর গার্ড: সাকসেসফুল ডাটা চেক
+                if (!res.ok || !data.choices?.[0]) {
+                    throw new Error(data.error || "AI Reconstruction failed. Please try again.");
+                }
 
-                // ক্রেডিট সেফটি আপডেট
+                // ক্রেডিট আপডেট (Safety Check for null properties)
                 if (data.total_credits !== undefined && data.updated_count !== undefined) {
                     document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 }
@@ -160,11 +162,18 @@
                 document.getElementById('copyBtn').classList.remove('hidden');
                 topProgress.style.width = "100%";
                 document.getElementById('statusBox').classList.add('hidden');
-                if (navigator.vibrate) navigator.vibrate([50, 100, 50]);
-            } catch (err) { alert(err.message); topProgress.style.width = "0%"; document.getElementById('statusBox').classList.add('hidden'); }
+            } catch (err) { 
+                alert("বিপদ: " + err.message); 
+                topProgress.style.width = "0%"; 
+                document.getElementById('statusBox').classList.add('hidden'); 
+            }
         };
 
-        document.getElementById('copyBtn').addEventListener('click', () => { navigator.clipboard.writeText(outFrame.contentDocument.body.innerHTML); alert("HTML Copied!"); });
+        document.getElementById('copyBtn').addEventListener('click', () => {
+            navigator.clipboard.writeText(outFrame.contentDocument.body.innerHTML);
+            alert("HTML Copied!");
+        });
+
         document.getElementById('downloadBtn').addEventListener('click', () => {
             const blob = new Blob(['\ufeff', outFrame.contentDocument.documentElement.outerHTML], { type: 'application/msword' });
             saveAs(blob, 'Docufai_Export.doc');
