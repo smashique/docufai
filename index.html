@@ -33,7 +33,6 @@
                     <input type="file" id="fileInput" class="hidden" accept="image/*,application/pdf">
                     <p id="dropText" class="text-[10px] font-black uppercase text-slate-400">Select PDF or Image Source</p>
                 </div>
-
                 <div id="pdfControls" class="hidden mt-6 space-y-4">
                     <div class="flex justify-between items-center bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
                         <div>
@@ -45,15 +44,10 @@
                             <p id="totalPages" class="font-black text-indigo-700 text-lg">0</p>
                         </div>
                     </div>
-                    <div class="relative group">
-                        <p class="text-[9px] font-black text-slate-400 uppercase mb-2 ml-1">Page Navigator</p>
-                        <div id="previewScroll" class="flex space-x-3 overflow-x-auto pb-4 scroll-smooth"></div>
-                    </div>
+                    <div id="previewScroll" class="flex space-x-3 overflow-x-auto pb-4 scroll-smooth"></div>
                 </div>
-
                 <button id="processBtn" class="w-full mt-6 bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">ARCHITECT NOW ⚡</button>
             </div>
-            
             <div id="statusBox" class="hidden bg-white p-6 rounded-2xl text-center shadow-md">
                 <div class="w-6 h-6 border-t-2 border-indigo-600 rounded-full animate-spin mx-auto mb-2"></div>
                 <p class="text-[10px] font-black uppercase italic text-slate-600">Engineering Structure...</p>
@@ -68,11 +62,7 @@
                     <button id="downloadBtn" class="hidden bg-emerald-600 text-white text-[9px] px-3 py-1.5 rounded-lg hover:bg-emerald-700 shadow-lg">DOCX</button>
                 </div>
             </div>
-            <div class="bg-white rounded-b-2xl border min-h-[750px] overflow-hidden relative shadow-2xl">
-                <div id="welcomeScreen" class="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
-                    <h2 class="text-2xl font-black text-slate-800 mb-2">Ready for Architecture?</h2>
-                    <p class="text-slate-400 text-sm">PDF পেজ সিলেক্ট করুন অথবা ইমেজ আপলোড করে ম্যাজিক দেখুন।</p>
-                </div>
+            <div class="bg-white rounded-b-2xl border min-h-[750px] relative overflow-hidden">
                 <iframe id="outputFrame" class="hidden w-full h-[750px] border-none"></iframe>
             </div>
         </section>
@@ -84,10 +74,7 @@
         import { sharpenForAI, getEliteWordTemplate } from './formats.js';
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        
-        const state = { 
-            userId: localStorage.getItem('doc_user_id') || 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase() 
-        };
+        const state = { userId: localStorage.getItem('doc_user_id') || 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase() };
         localStorage.setItem('doc_user_id', state.userId);
 
         const fileInput = document.getElementById('fileInput');
@@ -97,11 +84,7 @@
         const outFrame = document.getElementById('outputFrame');
         const topProgress = document.getElementById('topProgress');
 
-        // Recharge & Upload Listeners
-        document.getElementById('rechargeBtn').addEventListener('click', () => {
-            window.location.href = `/api/pay?userId=${state.userId}`;
-        });
-        
+        document.getElementById('rechargeBtn').addEventListener('click', () => window.location.href = `/api/pay?userId=${state.userId}`);
         dropZone.addEventListener('click', () => fileInput.click());
 
         fileInput.addEventListener('change', async () => {
@@ -113,9 +96,7 @@
                 const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
                 document.getElementById('totalPages').innerText = pdf.numPages;
                 renderPreviews(pdf);
-            } else { 
-                pdfControls.classList.add('hidden'); 
-            }
+            } else { pdfControls.classList.add('hidden'); }
         });
 
         async function renderPreviews(pdf) {
@@ -123,7 +104,7 @@
             for (let i = 1; i <= Math.min(pdf.numPages, 15); i++) {
                 const page = await pdf.getPage(i);
                 const canvas = document.createElement('canvas');
-                canvas.className = `page-thumb shrink-0 border-2 border-transparent rounded-lg cursor-pointer w-20 bg-white transition-all hover:border-indigo-300`;
+                canvas.className = `page-thumb shrink-0 border-2 border-transparent rounded-lg cursor-pointer w-20 bg-white transition-all`;
                 const viewport = page.getViewport({ scale: 0.15 });
                 canvas.width = viewport.width; canvas.height = viewport.height;
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
@@ -136,18 +117,15 @@
             }
         }
 
-        // --- মূল প্রসেসিং লজিক ---
         document.getElementById('processBtn').onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return alert("Select file first!");
-            
             topProgress.style.width = "40%";
             document.getElementById('statusBox').classList.remove('hidden');
             
             try {
                 const canvas = document.getElementById('pdfCanvas');
                 const ctx = canvas.getContext('2d');
-                
                 if (file.type === "application/pdf") {
                     const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
                     const page = await pdf.getPage(parseInt(document.getElementById('targetPage').value) || 1);
@@ -162,8 +140,6 @@
                 }
 
                 sharpenForAI(canvas);
-                
-                // ছবির সাইজ ছোট করা (Timeout এড়াতে JPEG ব্যবহার করা হয়েছে)
                 const b64Data = canvas.toDataURL('image/jpeg', 0.7).split(',')[1]; 
 
                 const res = await fetch("/api/engine", {
@@ -173,44 +149,31 @@
                 });
 
                 const data = await res.json();
-                
-                // এরর গার্ড: 'choices' এবং ডাটা স্ট্রাকচার চেক
-                if (!res.ok || !data.choices || !data.choices[0]) {
-                    throw new Error(data.error || "AI Response empty. Please try again.");
-                }
+                if (!res.ok || !data.choices?.[0]) throw new Error(data.error || "AI Error");
 
-                // ক্রেডিট ডিসপ্লে আপডেট (Safety Fix for Null Credits)
-                if (data && data.total_credits !== undefined && data.updated_count !== undefined) {
+                // ক্রেডিট সেফটি আপডেট
+                if (data.total_credits !== undefined && data.updated_count !== undefined) {
                     document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 }
 
-                document.getElementById('welcomeScreen').classList.add('hidden');
                 outFrame.classList.remove('hidden');
-                const aiHTML = data.choices[0].message.content.replace(/```html|```/g, "").trim();
-                outFrame.srcdoc = getEliteWordTemplate(aiHTML);
-
+                outFrame.srcdoc = getEliteWordTemplate(data.choices[0].message.content.replace(/```html|```/g, "").trim());
                 outFrame.onload = () => { outFrame.contentDocument.body.contentEditable = 'true'; };
+                
                 document.getElementById('downloadBtn').classList.remove('hidden');
                 document.getElementById('copyBtn').classList.remove('hidden');
                 topProgress.style.width = "100%";
                 document.getElementById('statusBox').classList.add('hidden');
-
-            } catch (err) { 
-                alert("এরর: " + err.message); 
-                topProgress.style.width = "0%";
-                document.getElementById('statusBox').classList.add('hidden');
-            }
+            } catch (err) { alert(err.message); topProgress.style.width = "0%"; document.getElementById('statusBox').classList.add('hidden'); }
         };
 
-        // Copy & Download
         document.getElementById('copyBtn').addEventListener('click', () => {
             navigator.clipboard.writeText(outFrame.contentDocument.body.innerHTML);
-            alert("HTML কপি হয়েছে!");
+            alert("HTML Copied!");
         });
-
         document.getElementById('downloadBtn').addEventListener('click', () => {
             const blob = new Blob(['\ufeff', outFrame.contentDocument.documentElement.outerHTML], { type: 'application/msword' });
-            saveAs(blob, 'Docufai_Pro_Export.doc');
+            saveAs(blob, 'Docufai_Export.doc');
         });
     </script>
 </body>
