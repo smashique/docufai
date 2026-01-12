@@ -1,41 +1,90 @@
-// api/formats.js
+// api/engine.js - The Modular Connection Bridge
 
-// ইমেজ শার্পনার: এআই-এর জন্য ছবি পরিষ্কার করা
-export const sharpenForAI = (canvas) => {
-    const ctx = canvas.getContext('2d');
-    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const d = imgData.data;
-    for (let i = 0; i < d.length; i += 4) {
-        const v = (d[i] * 0.3 + d[i+1] * 0.59 + d[i+2] * 0.11); // Grayscale
-        d[i] = d[i+1] = d[i+2] = v > 128 ? v + 25 : v - 25; // Contrast Boost
+import { createClient } from '@supabase/supabase-js';
+import { ELITE_PROMPT } from './prompts.js'; // ডেডিকেটেড প্রম্পট ইম্পোর্ট
+
+// সুপাবেস ইনিশিয়ালাইজেশন
+const supabase = createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+);
+
+export default async function handler(req, res) {
+    if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
+
+    const { imageB64, userInfo } = req.body;
+    const userId = userInfo?.id;
+
+    if (!userId || !imageB64) {
+        return res.status(400).json({ error: "Missing User ID or Image Data" });
     }
-    ctx.putImageData(imgData, 0, 0);
-};
 
-// ইউনিভার্সাল ওয়ার্ড টেমপ্লেট
-export const getEliteWordTemplate = (body, header = "", footer = "") => {
-    return `
-    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-    <head><meta charset="utf-8">
-        <script>window.MathJax = { tex: { inlineMath: [['$', '$']] } };<\/script>
-        <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async><\/script>
-        <style>
-            @page { size: 21cm 29.7cm; margin: 1.27cm; mso-header: url("h1") h1; mso-footer: url("f1") f1; }
-            body { font-family: 'Times New Roman', 'Siyam Rupali', serif; font-size: 10.5pt; line-height: 1.2; color: #000; }
-            .grid-row { display: table; width: 100%; table-layout: fixed; margin-bottom: 8pt; }
-            .col-item { display: table-cell; vertical-align: top; padding: 5pt; }
-            .floating-box { border: 1.5pt solid #000; padding: 10pt; margin: 10pt 0; }
-            table { border-collapse: collapse; width: 100%; border: 1pt solid #000; }
-            td { border: 1pt solid #000; padding: 4pt; vertical-align: top; }
-            #h1, #f1 { font-size: 9pt; text-align: center; border-bottom: 1px solid #ddd; }
-            [dir="rtl"] { text-align: right; }
-        </style>
-    </head>
-    <body>
-        <div class="Section1">
-            <header id="h1" style='mso-element:header'>${header || 'Docufai Pro Elite Architecture'}</header>
-            <main>${body}</main>
-            <footer id="f1" style='mso-element:footer'>Page <span style="mso-field-code: PAGE "></span></footer>
-        </div>
-    </body></html>`;
-};
+    try {
+        // ১. ক্রেডিট চেক (Database Security)
+        const { data: user, error: userError } = await supabase
+            .from('users')
+            .select('total_credits, updated_count')
+            .eq('id', userId)
+            .single();
+
+        if (userError || !user) {
+            // নতুন ইউজার হলে ১০ ক্রেডিট দিয়ে এন্ট্রি করা
+            await supabase.from('users').insert([{ id: userId, total_credits: 10, updated_count: 0 }]);
+            return res.status(200).json({ info: "First time user, credits initialized. Please retry." });
+        }
+
+        if (user.total_credits - user.updated_count <= 0) {
+            return res.status(402).json({ error: "Credits exhausted. Please recharge." }); //
+        }
+
+        // ২. গ্রক এপিআই কল (AI Brain - Llama 4 Scout)
+        const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
+            headers: {
+                "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                model: "meta-llama/llama-4-scout-17b-16e-instruct", // এলিট ভিশন মডেল
+                messages: [
+                    {
+                        role: "user",
+                        content: [
+                            { type: "text", text: ELITE_PROMPT }, // প্রম্পট ফাইল থেকে লোড
+                            {
+                                type: "image_url",
+                                image_url: { url: `data:image/png;base64,${imageB64}` }
+                            }
+                        ]
+                    }
+                ],
+                temperature: 0.1, // একুরেসি বাড়ানোর জন্য লো টেম্পারেচার
+                max_tokens: 4096
+            })
+        });
+
+        const aiData = await groqResponse.json();
+
+        if (!groqResponse.ok) {
+            throw new Error(aiData.error?.message || "AI processing failed");
+        }
+
+        // ৩. ক্রেডিট আপডেট (Billing Automation)
+        const newCount = user.updated_count + 1;
+        await supabase
+            .from('users')
+            .update({ updated_count: newCount })
+            .eq('id', userId);
+
+        // ৪. ফ্রন্টএন্ডে ডাটা পাঠানো
+        return res.status(200).json({
+            ...aiData,
+            total_credits: user.total_credits,
+            updated_count: newCount
+        });
+
+    } catch (err) {
+        console.error("Engine Error:", err.message);
+        return res.status(500).json({ error: err.message });
+    }
+}
