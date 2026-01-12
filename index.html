@@ -10,7 +10,6 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;900&family=Hind+Siliguri:wght@400;700&display=swap');
         body { font-family: 'Inter', 'Hind Siliguri', sans-serif; }
         .progress-line { height: 4px; width: 0%; background: #6366f1; transition: width 0.4s; position: fixed; top: 0; left: 0; z-index: 100; }
-        /* Custom Scrollbar for Slider */
         #previewScroll::-webkit-scrollbar { height: 4px; }
         #previewScroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
         .page-thumb.active { border: 3px solid #6366f1; transform: scale(0.98); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
@@ -46,7 +45,6 @@
                             <p id="totalPages" class="font-black text-indigo-700 text-lg">0</p>
                         </div>
                     </div>
-
                     <div class="relative group">
                         <p class="text-[9px] font-black text-slate-400 uppercase mb-2 ml-1">Page Navigator</p>
                         <div id="previewScroll" class="flex space-x-3 overflow-x-auto pb-4 scroll-smooth"></div>
@@ -86,7 +84,6 @@
         import { sharpenForAI, getEliteWordTemplate } from './formats.js';
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        
         const state = { userId: localStorage.getItem('doc_user_id') || 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase() };
         localStorage.setItem('doc_user_id', state.userId);
 
@@ -95,27 +92,23 @@
         const pdfControls = document.getElementById('pdfControls');
         const previewScroll = document.getElementById('previewScroll');
         const outFrame = document.getElementById('outputFrame');
+        const topProgress = document.getElementById('topProgress');
 
-        // ১. বাটন বাইন্ডিং
         document.getElementById('rechargeBtn').addEventListener('click', () => window.location.href = `/api/pay?userId=${state.userId}`);
         dropZone.addEventListener('click', () => fileInput.click());
 
         fileInput.addEventListener('change', async () => {
             const file = fileInput.files[0];
             if (!file) return;
-
             document.getElementById('dropText').innerText = file.name;
             if (file.type === "application/pdf") {
                 pdfControls.classList.remove('hidden');
                 const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
                 document.getElementById('totalPages').innerText = pdf.numPages;
                 renderPreviews(pdf);
-            } else {
-                pdfControls.classList.add('hidden');
-            }
+            } else { pdfControls.classList.add('hidden'); }
         });
 
-        // ২. স্লাইডিং প্রিভিউ রেন্ডারার
         async function renderPreviews(pdf) {
             previewScroll.innerHTML = '';
             for (let i = 1; i <= Math.min(pdf.numPages, 15); i++) {
@@ -125,7 +118,6 @@
                 const viewport = page.getViewport({ scale: 0.15 });
                 canvas.width = viewport.width; canvas.height = viewport.height;
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                
                 canvas.onclick = () => {
                     document.getElementById('targetPage').value = i;
                     document.querySelectorAll('.page-thumb').forEach(el => el.classList.remove('active'));
@@ -135,31 +127,35 @@
             }
         }
 
-        // ৩. প্রসেসিং ও এরর গার্ড
-        processBtn.onclick = async () => {
-            if (!fileInput.files[0]) return alert("Select file first!");
-            document.getElementById('topProgress').style.width = "40%";
+        // --- মূল প্রসেসিং লজিক (ইমেজ কম্প্রেসারসহ) ---
+        document.getElementById('processBtn').onclick = async () => {
+            const file = fileInput.files[0];
+            if (!file) return alert("Select file first!");
+            
+            topProgress.style.width = "40%";
             document.getElementById('statusBox').classList.remove('hidden');
             
             try {
                 const canvas = document.getElementById('pdfCanvas');
-                const file = fileInput.files[0];
+                const ctx = canvas.getContext('2d');
                 
                 if (file.type === "application/pdf") {
                     const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
                     const page = await pdf.getPage(parseInt(document.getElementById('targetPage').value) || 1);
                     const viewport = page.getViewport({ scale: 2 });
                     canvas.width = viewport.width; canvas.height = viewport.height;
-                    await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+                    await page.render({ canvasContext: ctx, viewport }).promise;
                 } else {
                     const img = new Image(); img.src = URL.createObjectURL(file);
                     await new Promise(r => img.onload = r);
                     canvas.width = img.width; canvas.height = img.height;
-                    canvas.getContext('2d').drawImage(img, 0, 0);
+                    ctx.drawImage(img, 0, 0);
                 }
 
                 sharpenForAI(canvas);
-                const b64Data = canvas.toDataURL('image/png').split(',')[1];
+                
+                // ছবির মান ঠিক রেখে সাইজ ছোট করা (Timeout এড়াতে JPEG ব্যবহার করা হয়েছে)
+                const b64Data = canvas.toDataURL('image/jpeg', 0.7).split(',')[1]; 
 
                 const res = await fetch("/api/engine", {
                     method: "POST",
@@ -169,8 +165,8 @@
 
                 const data = await res.json();
                 
-                // --- এরর গার্ড যুক্ত করা হলো (Reading '0' fix) ---
-                if (!res.ok || !data.choices || data.choices.length === 0) {
+                // এরর গার্ড: 'choices' অবজেক্ট আছে কি না চেক করা
+                if (!res.ok || !data.choices || !data.choices[0]) {
                     throw new Error(data.error || "AI Response empty. Please try again.");
                 }
 
@@ -183,17 +179,16 @@
                 document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 document.getElementById('downloadBtn').classList.remove('hidden');
                 document.getElementById('copyBtn').classList.remove('hidden');
-                document.getElementById('topProgress').style.width = "100%";
+                topProgress.style.width = "100%";
                 document.getElementById('statusBox').classList.add('hidden');
 
             } catch (err) { 
                 alert("এরর: " + err.message); 
-                document.getElementById('topProgress').style.width = "0%";
+                topProgress.style.width = "0%";
                 document.getElementById('statusBox').classList.add('hidden');
             }
         };
 
-        // ৪. কপি ও ডাউনলোড
         document.getElementById('copyBtn').addEventListener('click', () => {
             navigator.clipboard.writeText(outFrame.contentDocument.body.innerHTML);
             alert("HTML কপি হয়েছে!");
