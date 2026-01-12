@@ -53,7 +53,6 @@
 
                 <button id="processBtn" class="w-full mt-6 bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">ARCHITECT NOW ⚡</button>
             </div>
-            
             <div id="statusBox" class="hidden bg-white p-6 rounded-2xl text-center shadow-md">
                 <div class="w-6 h-6 border-t-2 border-indigo-600 rounded-full animate-spin mx-auto mb-2"></div>
                 <p class="text-[10px] font-black uppercase italic text-slate-600">Engineering Structure...</p>
@@ -127,7 +126,7 @@
             }
         }
 
-        // --- মূল প্রসেসিং লজিক (ইমেজ কম্প্রেসারসহ) ---
+        // --- মূল প্রসেসিং লজিক (ইমেজ কম্প্রেসার ও এরর গার্ডসহ) ---
         document.getElementById('processBtn').onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return alert("Select file first!");
@@ -154,7 +153,7 @@
 
                 sharpenForAI(canvas);
                 
-                // ছবির মান ঠিক রেখে সাইজ ছোট করা (Timeout এড়াতে JPEG ব্যবহার করা হয়েছে)
+                // ছবির সাইজ ছোট করা (Timeout এড়াতে)
                 const b64Data = canvas.toDataURL('image/jpeg', 0.7).split(',')[1]; 
 
                 const res = await fetch("/api/engine", {
@@ -165,9 +164,14 @@
 
                 const data = await res.json();
                 
-                // এরর গার্ড: 'choices' অবজেক্ট আছে কি না চেক করা
+                // এরর গার্ড: 'choices' এবং ক্রেডিট ডাটা চেক
                 if (!res.ok || !data.choices || !data.choices[0]) {
                     throw new Error(data.error || "AI Response empty. Please try again.");
+                }
+
+                // ক্রেডিট ডিসপ্লে আপডেট (Safety Fix)
+                if (data.total_credits !== undefined && data.updated_count !== undefined) {
+                    document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 }
 
                 document.getElementById('welcomeScreen').classList.add('hidden');
@@ -176,7 +180,6 @@
                 outFrame.srcdoc = getEliteWordTemplate(aiHTML);
 
                 outFrame.onload = () => { outFrame.contentDocument.body.contentEditable = 'true'; };
-                document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 document.getElementById('downloadBtn').classList.remove('hidden');
                 document.getElementById('copyBtn').classList.remove('hidden');
                 topProgress.style.width = "100%";
