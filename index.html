@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Docufai Pro - Elite AI Architect</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/file-saver/dist/FileSaver.min.js"></script>
@@ -13,7 +12,7 @@
         .progress-line { height: 4px; width: 0%; background: #6366f1; transition: width 0.4s; position: fixed; top: 0; left: 0; z-index: 100; }
         #previewScroll::-webkit-scrollbar { height: 4px; }
         #previewScroll::-webkit-scrollbar-thumb { background: #6366f1; border-radius: 10px; }
-        .page-thumb.active { border: 3px solid #6366f1; transform: scale(0.98); box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .page-thumb.active { border: 3px solid #6366f1; transform: scale(0.98); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
@@ -21,47 +20,27 @@
     <div id="incognitoAlert" class="hidden fixed inset-0 bg-slate-900/95 z-[9999] flex items-center justify-center p-6 backdrop-blur-md">
         <div class="bg-white rounded-3xl p-10 max-w-md w-full text-center shadow-2xl border-4 border-indigo-600">
             <div class="text-7xl mb-6">🚫</div>
-            <h2 class="text-2xl font-black text-slate-900 mb-4 uppercase italic">Incognito Detected!</h2>
-            <p class="text-slate-600 mb-8 font-bold leading-relaxed">
-                Sorry! To protect your credits and data integrity, **Docufai Pro** does not support Incognito mode. 
-                <br><br>
-                Please reopen the site in a **Normal Tab**.
-            </p>
-            <button onclick="window.location.reload()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl hover:bg-indigo-700 transition-all shadow-lg active:scale-95">RELOAD SITE ⚡</button>
+            <h2 class="text-2xl font-black text-slate-900 mb-4 uppercase italic">Incognito Blocked</h2>
+            <p class="text-slate-600 mb-8 font-bold leading-relaxed">Docufai Pro requires a Normal Tab to protect your processing data and credits.</p>
+            <button onclick="window.location.reload()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95">RELOAD SITE ⚡</button>
         </div>
     </div>
 
     <script>
-        // Multi-layer Incognito Detection
         async function checkIncognito() {
             const alertBox = document.getElementById('incognitoAlert');
-            const mainContent = document.querySelector('main');
             let isPrivate = false;
-
             try {
                 if ('storage' in navigator && 'estimate' in navigator.storage) {
                     const { quota } = await navigator.storage.estimate();
-                    if (quota < 512 * 1024 * 1024) isPrivate = true; // 512MB threshold
-                }
-                if (!isPrivate && /Chrome|Edge/.test(navigator.userAgent)) {
-                    const fs = window.webkitRequestFileSystem || window.requestFileSystem;
-                    if (fs) {
-                        await new Promise(resolve => {
-                            fs(window.TEMPORARY, 100, () => resolve(false), () => { isPrivate = true; resolve(true); });
-                        });
-                    }
-                }
-                if (!isPrivate && navigator.userAgent.includes("Firefox")) {
-                    const db = indexedDB.open("test");
-                    db.onerror = () => { isPrivate = true; };
+                    if (quota < 512 * 1024 * 1024) isPrivate = true;
                 }
                 localStorage.setItem("__inc_test__", "1");
                 localStorage.removeItem("__inc_test__");
             } catch (e) { isPrivate = true; }
-
             if (isPrivate) {
                 alertBox.classList.remove('hidden');
-                if (mainContent) mainContent.innerHTML = ""; // Security Wipe
+                document.querySelector('main').innerHTML = ""; 
             }
         }
         window.addEventListener('DOMContentLoaded', checkIncognito);
@@ -70,21 +49,17 @@
     <div id="topProgress" class="progress-line"></div>
     
     <nav class="bg-white/80 backdrop-blur-md sticky top-0 z-50 p-3 md:p-4 flex justify-between items-center shadow-sm">
-        <div class="font-black italic text-lg md:text-xl shrink-0">
-            DOCUFAI <span class="text-indigo-600 text-[8px] md:text-[10px] uppercase block -mt-1">Pro</span>
-        </div>
+        <div class="font-black italic text-lg md:text-xl shrink-0">DOCUFAI <span class="text-indigo-600 text-[8px] md:text-[10px] uppercase block -mt-1">Pro</span></div>
         
         <div class="flex items-center space-x-3 md:space-x-6 overflow-hidden">
             <div class="flex flex-col items-end shrink-0">
-                <span id="displayUserId" class="font-black text-indigo-600 text-base md:text-xl tracking-tighter md:tracking-widest leading-none"></span>
-                <span class="text-[7px] md:text-[9px] uppercase font-bold text-slate-400 leading-tight">Active ID</span>
+                <span id="displayUserId" class="font-black text-indigo-600 text-base md:text-2xl tracking-tighter leading-none"></span>
+                <span class="text-[7px] md:text-[9px] uppercase font-bold text-slate-400">User Identity</span>
             </div>
-            
             <div class="h-6 md:h-8 w-px bg-slate-200 shrink-0"></div>
-
             <div class="flex items-center space-x-2 md:space-x-3 shrink-0">
                 <span id="remCredits" class="font-black text-slate-800 italic text-base md:text-xl">10</span>
-                <button id="rechargeBtn" class="bg-indigo-600 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase shadow-lg transition-all active:scale-95">Recharge ⚡</button>
+                <button id="rechargeBtn" class="bg-indigo-600 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase shadow-lg">Recharge ⚡</button>
             </div>
         </div>
     </nav>
@@ -94,28 +69,16 @@
             <div class="bg-white p-6 rounded-3xl shadow-xl border border-slate-100">
                 <div id="dropZone" class="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center cursor-pointer hover:border-indigo-400 bg-slate-50 transition-all">
                     <input type="file" id="fileInput" class="hidden" accept="image/*,application/pdf">
-                    <p id="dropText" class="text-[10px] font-black uppercase text-slate-400">Select Source File</p>
+                    <p id="dropText" class="text-[10px] font-black uppercase text-slate-400">Select Math Paper</p>
                 </div>
-
                 <div id="pdfControls" class="hidden mt-6 space-y-4">
-                    <div class="flex justify-between items-center bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                        <div>
-                            <p class="text-[9px] font-black text-indigo-400 uppercase">Target Page</p>
-                            <input type="number" id="targetPage" value="1" min="1" class="bg-transparent font-black text-indigo-700 outline-none w-full text-lg">
-                        </div>
-                        <div class="text-right">
-                            <p class="text-[9px] font-black text-indigo-400 uppercase">Total</p>
-                            <p id="totalPages" class="font-black text-indigo-700 text-lg">0</p>
-                        </div>
-                    </div>
                     <div id="previewScroll" class="flex space-x-3 overflow-x-auto pb-4 scroll-smooth"></div>
                 </div>
-
                 <button id="processBtn" class="w-full mt-6 bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">ARCHITECT NOW ⚡</button>
             </div>
             <div id="statusBox" class="hidden bg-white p-6 rounded-2xl text-center shadow-md">
                 <div class="w-6 h-6 border-t-2 border-indigo-600 rounded-full animate-spin mx-auto mb-2"></div>
-                <p class="text-[10px] font-black uppercase italic text-slate-600">Processing DNA Structure...</p>
+                <p class="text-[10px] font-black uppercase italic text-slate-600">Reconstructing Math Layout...</p>
             </div>
         </aside>
 
@@ -123,15 +86,11 @@
             <div class="bg-slate-900 rounded-t-2xl px-6 py-4 flex justify-between items-center shadow-xl">
                 <span class="text-slate-500 text-[9px] font-mono tracking-widest uppercase italic">Architect Terminal v2.0</span>
                 <div class="flex space-x-2">
-                    <button id="copyBtn" class="hidden bg-slate-700 text-white text-[9px] px-3 py-1.5 rounded-lg hover:bg-slate-600 uppercase">Copy</button>
-                    <button id="downloadBtn" class="hidden bg-emerald-600 text-white text-[9px] px-3 py-1.5 rounded-lg shadow-lg uppercase font-bold tracking-tighter">Download DOCX</button>
+                    <button id="copyBtn" class="hidden bg-slate-700 text-white text-[9px] px-3 py-1.5 rounded-lg uppercase">Copy</button>
+                    <button id="downloadBtn" class="hidden bg-emerald-600 text-white text-[9px] px-3 py-1.5 rounded-lg shadow-lg uppercase font-bold">Download DOCX</button>
                 </div>
             </div>
             <div class="bg-white rounded-b-2xl border min-h-[750px] overflow-hidden relative shadow-2xl">
-                <div id="welcomeScreen" class="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
-                    <h2 class="text-2xl font-black text-slate-800 mb-2 italic">Ready for Architecture?</h2>
-                    <p class="text-slate-400 text-sm italic">Upload an image or select a PDF page to start.</p>
-                </div>
                 <iframe id="outputFrame" class="hidden w-full h-[750px] border-none"></iframe>
             </div>
         </section>
@@ -141,14 +100,9 @@
 
     <script type="module">
         import { sharpenForAI, getEliteWordTemplate } from './formats.js';
-
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        
-        // Initialize State
         const state = { userId: localStorage.getItem('doc_user_id') || 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase() };
         localStorage.setItem('doc_user_id', state.userId);
-        
-        // Display Large User ID in Nav
         document.getElementById('displayUserId').innerText = state.userId;
 
         const fileInput = document.getElementById('fileInput');
@@ -158,7 +112,6 @@
         const outFrame = document.getElementById('outputFrame');
         const topProgress = document.getElementById('topProgress');
 
-        document.getElementById('rechargeBtn').addEventListener('click', () => window.location.href = `/api/pay?userId=${state.userId}`);
         dropZone.addEventListener('click', () => fileInput.click());
 
         fileInput.addEventListener('change', async () => {
@@ -168,7 +121,6 @@
             if (file.type === "application/pdf") {
                 pdfControls.classList.remove('hidden');
                 const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
-                document.getElementById('totalPages').innerText = pdf.numPages;
                 renderPreviews(pdf);
             } else { pdfControls.classList.add('hidden'); }
         });
@@ -183,7 +135,6 @@
                 canvas.width = viewport.width; canvas.height = viewport.height;
                 await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
                 canvas.onclick = () => {
-                    document.getElementById('targetPage').value = i;
                     document.querySelectorAll('.page-thumb').forEach(el => el.classList.remove('active'));
                     canvas.classList.add('active');
                 };
@@ -196,13 +147,12 @@
             if (!file) return alert("Select a file first!");
             topProgress.style.width = "40%";
             document.getElementById('statusBox').classList.remove('hidden');
-            
             try {
                 const canvas = document.getElementById('pdfCanvas');
                 const ctx = canvas.getContext('2d');
                 if (file.type === "application/pdf") {
                     const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
-                    const page = await pdf.getPage(parseInt(document.getElementById('targetPage').value) || 1);
+                    const page = await pdf.getPage(1); // Default to first page for now
                     const viewport = page.getViewport({ scale: 2 });
                     canvas.width = viewport.width; canvas.height = viewport.height;
                     await page.render({ canvasContext: ctx, viewport }).promise;
@@ -212,28 +162,21 @@
                     canvas.width = img.width; canvas.height = img.height;
                     ctx.drawImage(img, 0, 0);
                 }
-
                 sharpenForAI(canvas);
                 const b64Data = canvas.toDataURL('image/jpeg', 0.7).split(',')[1]; 
-
                 const res = await fetch("/api/engine", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ imageB64: b64Data, userInfo: { id: state.userId } })
                 });
-
                 const data = await res.json();
                 if (!res.ok || !data.choices?.[0]) throw new Error(data.error || "AI Error");
-
-                if (data.total_credits !== undefined && data.updated_count !== undefined) {
+                if (data.total_credits !== undefined) {
                     document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 }
-
-                document.getElementById('welcomeScreen').classList.add('hidden');
                 outFrame.classList.remove('hidden');
                 outFrame.srcdoc = getEliteWordTemplate(data.choices[0].message.content.replace(/```html|```/g, "").trim());
                 outFrame.onload = () => { outFrame.contentDocument.body.contentEditable = 'true'; };
-                
                 document.getElementById('downloadBtn').classList.remove('hidden');
                 document.getElementById('copyBtn').classList.remove('hidden');
                 topProgress.style.width = "100%";
