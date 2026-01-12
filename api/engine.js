@@ -6,8 +6,15 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
+    
     const { imageB64, userInfo } = req.body;
     const userId = userInfo?.id;
+
+    // এপিআই কী চেক (সার্ভার লগে দেখা যাবে কী-টি লোড হয়েছে কি না)
+    const rawApiKey = process.env.GROQ_API_KEY;
+    if (!rawApiKey) {
+        return res.status(500).json({ error: "Engine Error: GROQ_API_KEY is missing in Vercel settings." });
+    }
 
     if (!userId || !imageB64) return res.status(400).json({ error: "Missing required data" });
 
@@ -19,7 +26,6 @@ export default async function handler(req, res) {
             .eq('id', userId)
             .single();
 
-        // ইউজার না থাকলে নতুন ইউজার তৈরি করা
         if (!user || fetchError) {
             const { data: newUser, error: insertError } = await supabase
                 .from('users')
@@ -34,11 +40,12 @@ export default async function handler(req, res) {
             return res.status(402).json({ error: "Credits exhausted!" });
         }
 
-        // ২. Groq API কল (Stable Vision Model)
+        // ২. Groq API কল (Safety Trimming যুক্ত করা হয়েছে)
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: { 
-                "Authorization": `Bearer ${process.env.GROQ_API_KEY}`, 
+                // .trim() ব্যবহার করা হয়েছে যাতে কোনো স্পেস এরর না হয়
+                "Authorization": `Bearer ${rawApiKey.trim()}`, 
                 "Content-Type": "application/json" 
             },
             body: JSON.stringify({
@@ -52,9 +59,13 @@ export default async function handler(req, res) {
         });
 
         const aiData = await groqRes.json();
-        if (!groqRes.ok) throw new Error(aiData.error?.message || "Groq processing failed");
+        
+        // Groq থেকে সুনির্দিষ্ট এরর মেসেজ ধরা
+        if (!groqRes.ok) {
+            throw new Error(aiData.error?.message || `Groq API Error: ${groqRes.status}`);
+        }
 
-        // ৩. ক্রেডিট আপডেট ও সফল রিটার্ন
+        // ৩. ক্রেডিট আপডেট
         const newCount = user.updated_count + 1;
         await supabase.from('users').update({ updated_count: newCount }).eq('id', userId);
 
