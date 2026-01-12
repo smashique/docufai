@@ -35,7 +35,7 @@
         <div class="flex items-center space-x-3 md:space-x-6 overflow-hidden">
             <div class="flex flex-col items-end shrink-0">
                 <span id="displayUserId" class="font-black text-indigo-600 text-base md:text-2xl leading-none tracking-tighter"></span>
-                <span class="text-[7px] md:text-[9px] uppercase font-bold text-slate-400">User ID</span>
+                <span class="text-[7px] md:text-[9px] uppercase font-bold text-slate-400">User Identity</span>
             </div>
             <div class="h-6 md:h-8 w-px bg-slate-200 shrink-0"></div>
             <div class="flex items-center space-x-2 md:space-x-3 shrink-0">
@@ -50,7 +50,7 @@
             <div class="bg-white p-6 rounded-3xl shadow-xl border border-slate-100">
                 <div id="dropZone" class="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center cursor-pointer hover:border-indigo-400 bg-slate-50 transition-all">
                     <input type="file" id="fileInput" class="hidden" accept="image/*,application/pdf">
-                    <p id="dropText" class="text-[10px] font-black uppercase text-slate-400 italic">Select Math Source File</p>
+                    <p id="dropText" class="text-[10px] font-black uppercase text-slate-400 italic">Select Source File</p>
                 </div>
                 
                 <div id="pdfControls" class="hidden mt-6 overflow-x-auto flex space-x-3 pb-2 scroll-smooth"></div>
@@ -96,7 +96,7 @@
         const outFrame = document.getElementById('outputFrame');
         const pdfControls = document.getElementById('pdfControls');
 
-        // Security Check
+        //
         async function checkIncognito() {
             const alertBox = document.getElementById('incognitoAlert');
             let isPrivate = false;
@@ -121,7 +121,6 @@
             const file = fileInput.files[0];
             if (!file) return;
             document.getElementById('dropText').innerText = file.name;
-            
             if (file.type === "application/pdf") {
                 const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
                 renderPreviews(pdf);
@@ -131,6 +130,7 @@
             }
         };
 
+        //
         async function renderPreviews(pdf) {
             pdfControls.innerHTML = '';
             pdfControls.classList.remove('hidden');
@@ -179,9 +179,20 @@
                     body: JSON.stringify({ imageB64: canvas.toDataURL('image/jpeg', 0.7).split(',')[1], userInfo: { id: state.userId } })
                 });
 
+                // Improved JSON/Text Error Handler
+                if (!res.ok) {
+                    let errorMsg = "Server Error";
+                    try {
+                        const errData = await res.json();
+                        errorMsg = errData.error || errorMsg;
+                    } catch (e) {
+                        // If res.json() fails, show the raw text (this catches the "A server error..." text)
+                        errorMsg = await res.text();
+                    }
+                    throw new Error(errorMsg);
+                }
+
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.error || "AI Error");
-                
                 document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 outFrame.classList.remove('hidden');
                 outFrame.srcdoc = getEliteWordTemplate(data.choices[0].message.content.replace(/```html|```/g, "").trim());
@@ -192,7 +203,8 @@
                 document.getElementById('topProgress').style.width = "100%";
                 document.getElementById('statusBox').classList.add('hidden');
             } catch (err) { 
-                alert(err.message); 
+                // Displays the real error message
+                alert("Critical Error: " + err.message); 
                 document.getElementById('statusBox').classList.add('hidden');
                 document.getElementById('topProgress').style.width = "0%";
             }
@@ -201,7 +213,7 @@
         document.getElementById('copyBtn').onclick = () => { navigator.clipboard.writeText(outFrame.contentDocument.body.innerHTML); alert("Copied!"); };
         document.getElementById('downloadBtn').onclick = () => {
             const blob = new Blob(['\ufeff', outFrame.contentDocument.documentElement.outerHTML], { type: 'application/msword' });
-            saveAs(blob, 'Math_Exam_Export.doc');
+            saveAs(blob, 'Docufai_Export.doc');
         };
     </script>
 </body>
