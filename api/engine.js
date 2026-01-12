@@ -1,8 +1,6 @@
 // api/engine.js
 import { createClient } from '@supabase/supabase-js';
-import { ELITE_MATH_PROMPT } from './prompts.js'; 
-
-const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+import { ELITE_MATH_PROMPT } from './prompts.js';
 
 export default async function handler(req, res) {
     // প্রথমেই হেডার সেট করা যাতে ক্র্যাশ করলেও JSON রিটার্ন হয়
@@ -11,19 +9,21 @@ export default async function handler(req, res) {
     try {
         if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
 
+        // ১. Env Vars চেক করা (যদি এখানে সমস্যা থাকে তবে সরাসরি এরর দেখাবে)
+        if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+            throw new Error("Missing Supabase Environment Variables in Vercel settings.");
+        }
+
+        const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
         const { imageB64, userInfo } = req.body;
         const userId = userInfo?.id;
 
-        if (!userId || !imageB64) {
-            return res.status(400).json({ error: "Missing User ID or Image Data in request body." });
-        }
+        if (!userId) throw new Error("Missing User ID from frontend.");
 
-        // ১. ডাটাবেস চেক
+        // ২. ডাটাবেস চেক
         let { data: user, error: dbError } = await supabase.from('users').select('*').eq('id', userId).single();
         
-        if (dbError && dbError.code !== 'PGRST116') {
-            throw new Error(`Supabase Error: ${dbError.message}`);
-        }
+        if (dbError && dbError.code !== 'PGRST116') throw new Error(`DB Error: ${dbError.message}`);
 
         if (!user) {
             const { data: newUser, error: insError } = await supabase.from('users')
@@ -33,18 +33,13 @@ export default async function handler(req, res) {
             user = newUser;
         }
 
-        if (user.total_credits - user.updated_count <= 0) {
-            return res.status(402).json({ error: "Insufficient credits for this User ID." });
-        }
-
-        // ২. GROQ_KEYS চেক
+        // ৩. Groq কল (Llama 4 Scout)
         const keysString = process.env.GROQ_KEYS;
-        if (!keysString) throw new Error("Server Config Error: GROQ_KEYS environment variable is missing.");
+        if (!keysString) throw new Error("GROQ_KEYS is not set in Vercel.");
         
         const keyPool = keysString.split(',').map(k => k.trim()).filter(k => k.length > 0);
         const selectedKey = keyPool[Math.floor(Math.random() * keyPool.length)];
 
-        // ৩. AI Call
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: { "Authorization": `Bearer ${selectedKey}`, "Content-Type": "application/json" },
@@ -59,7 +54,7 @@ export default async function handler(req, res) {
         });
 
         const aiData = await groqRes.json();
-        if (!groqRes.ok) throw new Error(aiData.error?.message || "Groq API processing error.");
+        if (!groqRes.ok) throw new Error(aiData.error?.message || "AI Process failed.");
 
         // ৪. ক্রেডিট আপডেট
         const newCount = user.updated_count + 1;
@@ -72,8 +67,7 @@ export default async function handler(req, res) {
         });
 
     } catch (err) {
-        console.error("Engine Error Logged:", err.message);
-        // এটিই আপনার স্ক্রিনে এরর মেসেজ দেখাবে
+        // এই এররটিই এখন আপনার স্ক্রিনে আসল সমস্যার নাম দেখাবে
         return res.status(500).json({ error: err.message });
     }
 }
