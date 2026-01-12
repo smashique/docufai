@@ -7,13 +7,10 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 export default async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
     
-    // ১. Multi-Key হ্যান্ডলিং
-    const keysString = process.env.GROQ_KEYS; // আপনার ভেরিয়েবল নাম
-    if (!keysString) {
-        return res.status(500).json({ error: "Engine Error: GROQ_KEYS is missing in Vercel settings." });
-    }
+    // ১. Multi-Key হ্যান্ডলিং (GROQ_KEYS থেকে র‍্যান্ডম কী বাছাই)
+    const keysString = process.env.GROQ_KEYS;
+    if (!keysString) return res.status(500).json({ error: "Engine Error: GROQ_KEYS is missing." });
 
-    // কমা দিয়ে আলাদা করা কী-গুলোকে অ্যারেতে রূপান্তর এবং র‍্যান্ডম একটি সিলেক্ট করা
     const keyPool = keysString.split(',').map(k => k.trim()).filter(k => k.length > 0);
     const selectedKey = keyPool[Math.floor(Math.random() * keyPool.length)];
 
@@ -23,33 +20,24 @@ export default async function handler(req, res) {
     if (!userId || !imageB64) return res.status(400).json({ error: "Missing required data" });
 
     try {
-        // ২. ক্রেডিট চেক ও ইউজার হ্যান্ডলিং
-        let { data: user, error: fetchError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single();
-
-        if (!user || fetchError) {
+        // ২. ক্রেডিট চেক
+        let { data: user } = await supabase.from('users').select('*').eq('id', userId).single();
+        if (!user) {
             const { data: newUser } = await supabase.from('users')
                 .insert([{ id: userId, total_credits: 10, updated_count: 0 }])
                 .select().single();
             user = newUser;
         }
 
-        if (user.total_credits - user.updated_count <= 0) {
-            return res.status(402).json({ error: "Credits exhausted!" });
-        }
+        if (user.total_credits - user.updated_count <= 0) return res.status(402).json({ error: "Credits exhausted!" });
 
-        // ৩. Groq API কল (নির্বাচিত র‍্যান্ডম কী দিয়ে)
+        // ৩. Groq API কল (নতুন Llama 4 Scout মডেল ব্যবহার)
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
-            headers: { 
-                "Authorization": `Bearer ${selectedKey}`, 
-                "Content-Type": "application/json" 
-            },
+            headers: { "Authorization": `Bearer ${selectedKey}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-                model: "llama-3.2-11b-vision-preview",
+                // নতুন মডেল আইডি
+                model: "meta-llama/llama-4-scout-17b-16e-instruct", 
                 messages: [{ role: "user", content: [
                     { type: "text", text: ELITE_PROMPT },
                     { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageB64}` } }
