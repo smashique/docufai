@@ -12,17 +12,17 @@ export default async function handler(req, res) {
     try {
         let { data: user } = await supabase.from('users').select('*').eq('id', userId).single();
 
-        // নতুন ইউজার হলে ডাটাবেসে এন্ট্রি করা এবং ক্রেডিট পাঠানো
+        // নতুন ইউজার হলে ডাটাবেসে এন্ট্রি করা এবং সরাসরি ইউজার অবজেক্ট তৈরি করা
         if (!user) {
             const { data: newUser } = await supabase.from('users').insert([{ id: userId, total_credits: 10, updated_count: 0 }]).select().single();
             user = newUser;
-            // নতুন ইউজারের ক্ষেত্রেও সরাসরি এআই প্রসেসে চলে যাওয়া (যাতে Retry এরর না আসে)
         }
 
         if (user.total_credits - user.updated_count <= 0) {
             return res.status(402).json({ error: "Credits exhausted!" });
         }
 
+        // এআই কল (Stable Vision Model)
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: { "Authorization": `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
@@ -42,6 +42,7 @@ export default async function handler(req, res) {
         const newCount = user.updated_count + 1;
         await supabase.from('users').update({ updated_count: newCount }).eq('id', userId);
 
+        // সবসময় ক্রেডিট ডাটা অবজেক্টে পাঠানো নিশ্চিত করা
         return res.status(200).json({ 
             choices: aiData.choices,
             updated_count: newCount, 
