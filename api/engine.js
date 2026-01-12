@@ -5,7 +5,7 @@ import { ELITE_PROMPT } from './prompts.js';
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 export default async function handler(req, res) {
-    if (req.method !== 'POST') return res.status(405).json({ error: "Method not allowed" });
+    if (req.method !== 'POST') return res.status(405).json({ error: "POST required" });
     const { imageB64, userInfo } = req.body;
     const userId = userInfo?.id;
 
@@ -24,30 +24,23 @@ export default async function handler(req, res) {
             return res.status(402).json({ error: "Credits exhausted!" });
         }
 
-        // Groq এপিআই কল
+        // এআই কল (Llama 3.2 Vision)
         const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
-            headers: { 
-                "Authorization": `Bearer ${process.env.GROQ_API_KEY}`, 
-                "Content-Type": "application/json" 
-            },
+            headers: { "Authorization": `Bearer ${process.env.GROQ_API_KEY}`, "Content-Type": "application/json" },
             body: JSON.stringify({
-                model: "llama-3.2-11b-vision-preview", // স্থিতিশীল ভিশন মডেল
-                messages: [{ 
-                    role: "user", 
-                    content: [
-                        { type: "text", text: ELITE_PROMPT },
-                        { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageB64}` } }
-                    ]
-                }],
+                model: "llama-3.2-11b-vision-preview", 
+                messages: [{ role: "user", content: [
+                    { type: "text", text: ELITE_PROMPT },
+                    { type: "image_url", image_url: { url: `data:image/jpeg;base64,${imageB64}` } }
+                ]}],
                 temperature: 0.1
             })
         });
 
         const aiData = await groqRes.json();
-        if (!groqRes.ok) throw new Error(aiData.error?.message || "Groq processing failed");
+        if (!groqRes.ok) throw new Error(aiData.error?.message || "AI Failed");
 
-        // ক্রেডিট আপডেট ও রিটার্ন
         const newCount = user.updated_count + 1;
         await supabase.from('users').update({ updated_count: newCount }).eq('id', userId);
 
@@ -58,7 +51,6 @@ export default async function handler(req, res) {
         });
 
     } catch (err) {
-        console.error("Engine Error:", err.message);
         return res.status(500).json({ error: err.message });
     }
 }
