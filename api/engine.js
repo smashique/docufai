@@ -1,7 +1,6 @@
-// api/engine.js - The Modular Connection Bridge
-
+// api/engine.js
 import { createClient } from '@supabase/supabase-js';
-import { ELITE_PROMPT } from './prompts.js'; 
+import { ELITE_PROMPT } from './prompts.js';
 
 const supabase = createClient(
     process.env.SUPABASE_URL,
@@ -19,7 +18,7 @@ export default async function handler(req, res) {
     }
 
     try {
-        // ১. ক্রেডিট চেক (Database Security)
+        // ১. ক্রেডিট চেক
         const { data: user, error: userError } = await supabase
             .from('users')
             .select('total_credits, updated_count')
@@ -35,7 +34,7 @@ export default async function handler(req, res) {
             return res.status(402).json({ error: "Credits exhausted. Please recharge." });
         }
 
-        // ২. গ্রক এপিআই কল (AI Brain - Stable Vision Model Updated)
+        // ২. গ্রক এপিআই কল (Stable Vision Model)
         const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -43,7 +42,7 @@ export default async function handler(req, res) {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                // মডেল আপডেট করা হয়েছে: llama-3.2-11b-vision-preview
+                // সঠিক মডেল আইডি: llama-3.2-11b-vision-preview
                 model: "llama-3.2-11b-vision-preview", 
                 messages: [
                     {
@@ -57,30 +56,29 @@ export default async function handler(req, res) {
                         ]
                     }
                 ],
-                temperature: 0.1, // একুরেসি বাড়ানোর জন্য লো টেম্পারেচার
+                temperature: 0.1,
                 max_tokens: 4096
             })
         });
 
         const aiData = await groqResponse.json();
 
-        // এপিআই এরর বা খালি রেসপন্স হ্যান্ডলিং
+        // এরর চেক: এপিআই থেকে সরাসরি এরর আসলে তা হ্যান্ডেল করা
         if (!groqResponse.ok) {
-            throw new Error(aiData.error?.message || "Groq API processing failed");
+            return res.status(groqResponse.status).json({ 
+                error: aiData.error?.message || "Groq API Error: " + groqResponse.statusText 
+            });
         }
 
+        // আউটপুট চেক: choices না থাকলে এরর দেওয়া
         if (!aiData.choices || aiData.choices.length === 0) {
-            throw new Error("AI returned an empty response. Please try with a clearer image.");
+            return res.status(500).json({ error: "AI returned an empty response. Check if image size is too large." });
         }
 
-        // ৩. ক্রেডিট আপডেট (Billing Automation)
+        // ৩. ক্রেডিট আপডেট
         const newCount = user.updated_count + 1;
-        await supabase
-            .from('users')
-            .update({ updated_count: newCount })
-            .eq('id', userId);
+        await supabase.from('users').update({ updated_count: newCount }).eq('id', userId);
 
-        // ৪. ফ্রন্টএন্ডে ডাটা পাঠানো
         return res.status(200).json({
             ...aiData,
             total_credits: user.total_credits,
@@ -88,7 +86,6 @@ export default async function handler(req, res) {
         });
 
     } catch (err) {
-        console.error("Engine Error:", err.message);
-        return res.status(500).json({ error: err.message });
+        return res.status(500).json({ error: "Server Error: " + err.message });
     }
 }
