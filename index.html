@@ -23,7 +23,7 @@
             <div class="text-7xl mb-6">🚫</div>
             <h2 class="text-2xl font-black text-slate-900 mb-4 uppercase italic">Incognito Detected!</h2>
             <p class="text-slate-600 mb-8 font-bold leading-relaxed">
-                Sorry! To protect your credits and processing integrity, **Docufai Pro** does not support Incognito mode. 
+                Sorry! To protect your credits and data integrity, **Docufai Pro** does not support Incognito mode. 
                 <br><br>
                 Please reopen the site in a **Normal Tab**.
             </p>
@@ -41,7 +41,7 @@
             try {
                 if ('storage' in navigator && 'estimate' in navigator.storage) {
                     const { quota } = await navigator.storage.estimate();
-                    if (quota < 512 * 1024 * 1024) isPrivate = true;
+                    if (quota < 512 * 1024 * 1024) isPrivate = true; // 512MB threshold
                 }
                 if (!isPrivate && /Chrome|Edge/.test(navigator.userAgent)) {
                     const fs = window.webkitRequestFileSystem || window.requestFileSystem;
@@ -61,7 +61,7 @@
 
             if (isPrivate) {
                 alertBox.classList.remove('hidden');
-                if (mainContent) mainContent.innerHTML = ""; 
+                if (mainContent) mainContent.innerHTML = ""; // Security Wipe
             }
         }
         window.addEventListener('DOMContentLoaded', checkIncognito);
@@ -69,20 +69,22 @@
 
     <div id="topProgress" class="progress-line"></div>
     
-    <nav class="bg-white/80 backdrop-blur-md sticky top-0 z-50 p-4 flex justify-between items-center shadow-sm">
-        <div class="font-black italic text-xl">DOCUFAI <span class="text-indigo-600 text-[10px] uppercase block -mt-1">Pro</span></div>
+    <nav class="bg-white/80 backdrop-blur-md sticky top-0 z-50 p-3 md:p-4 flex justify-between items-center shadow-sm">
+        <div class="font-black italic text-lg md:text-xl shrink-0">
+            DOCUFAI <span class="text-indigo-600 text-[8px] md:text-[10px] uppercase block -mt-1">Pro</span>
+        </div>
         
-        <div class="flex items-center space-x-6">
-            <div class="flex flex-col items-end">
-                <span id="displayUserId" class="font-black text-indigo-600 text-xl tracking-widest leading-none"></span>
-                <span class="text-[9px] uppercase font-bold text-slate-400">Active User ID</span>
+        <div class="flex items-center space-x-3 md:space-x-6 overflow-hidden">
+            <div class="flex flex-col items-end shrink-0">
+                <span id="displayUserId" class="font-black text-indigo-600 text-base md:text-xl tracking-tighter md:tracking-widest leading-none"></span>
+                <span class="text-[7px] md:text-[9px] uppercase font-bold text-slate-400 leading-tight">Active ID</span>
             </div>
             
-            <div class="h-8 w-px bg-slate-200"></div>
+            <div class="h-6 md:h-8 w-px bg-slate-200 shrink-0"></div>
 
-            <div class="flex items-center space-x-3">
-                <span id="remCredits" class="font-black text-slate-800 italic text-xl">10</span>
-                <button id="rechargeBtn" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg transition-all active:scale-95">Recharge ⚡</button>
+            <div class="flex items-center space-x-2 md:space-x-3 shrink-0">
+                <span id="remCredits" class="font-black text-slate-800 italic text-base md:text-xl">10</span>
+                <button id="rechargeBtn" class="bg-indigo-600 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase shadow-lg transition-all active:scale-95">Recharge ⚡</button>
             </div>
         </div>
     </nav>
@@ -128,7 +130,7 @@
             <div class="bg-white rounded-b-2xl border min-h-[750px] overflow-hidden relative shadow-2xl">
                 <div id="welcomeScreen" class="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
                     <h2 class="text-2xl font-black text-slate-800 mb-2 italic">Ready for Architecture?</h2>
-                    <p class="text-slate-400 text-sm">Upload an image or select a PDF page to start.</p>
+                    <p class="text-slate-400 text-sm italic">Upload an image or select a PDF page to start.</p>
                 </div>
                 <iframe id="outputFrame" class="hidden w-full h-[750px] border-none"></iframe>
             </div>
