@@ -10,10 +10,18 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;900&display=swap');
         body { font-family: 'Inter', sans-serif; }
         .progress-line { height: 4px; width: 0%; background: #6366f1; transition: width 0.4s; position: fixed; top: 0; left: 0; z-index: 100; }
-        .page-thumb.active { border: 3px solid #6366f1; transform: scale(0.95); box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3); }
+        .page-thumb.active { border: 3px solid #6366f1; transform: scale(0.95); }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900">
+
+    <div id="incognitoAlert" class="hidden fixed inset-0 bg-slate-900/95 z-[9999] flex items-center justify-center p-6 backdrop-blur-md">
+        <div class="bg-white rounded-3xl p-10 max-w-md w-full text-center shadow-2xl">
+            <h2 class="text-2xl font-black mb-4 uppercase">Incognito Blocked</h2>
+            <p class="mb-8 font-bold text-slate-500">Normal mode required to sync your credits.</p>
+            <button onclick="window.location.reload()" class="w-full bg-indigo-600 text-white font-black py-4 rounded-2xl">RELOAD SITE ⚡</button>
+        </div>
+    </div>
 
     <div id="topProgress" class="progress-line"></div>
     
@@ -21,12 +29,12 @@
         <div class="font-black italic text-lg md:text-xl shrink-0">DOCUFAI <span class="text-indigo-600 text-[8px] uppercase block">Pro</span></div>
         <div class="flex items-center space-x-3 md:space-x-6">
             <div class="flex flex-col items-end shrink-0">
-                <span id="displayUserId" class="font-black text-indigo-600 text-base md:text-2xl leading-none"></span>
+                <span id="displayUserId" class="font-black text-indigo-600 text-lg md:text-2xl leading-none"></span>
                 <span class="text-[7px] md:text-[9px] uppercase font-bold text-slate-400">User ID</span>
             </div>
             <div class="flex items-center space-x-2 md:space-x-3">
                 <span id="remCredits" class="font-black text-slate-800 text-lg md:text-xl">10</span>
-                <button id="rechargeBtn" class="bg-indigo-600 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase">Recharge ⚡</button>
+                <button id="rechargeBtn" class="bg-indigo-600 text-white px-3 md:px-4 py-1.5 md:py-2 rounded-xl text-[8px] md:text-[10px] font-black uppercase shadow-lg">Recharge ⚡</button>
             </div>
         </div>
     </nav>
@@ -36,19 +44,19 @@
             <div class="bg-white p-6 rounded-3xl shadow-xl border border-slate-100">
                 <div id="dropZone" class="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center cursor-pointer hover:border-indigo-400 bg-slate-50">
                     <input type="file" id="fileInput" class="hidden" accept="image/*,application/pdf">
-                    <p id="dropText" class="text-[10px] font-black uppercase text-slate-400">Select Math File</p>
+                    <p class="text-[10px] font-black uppercase text-slate-400">Upload Math MCQ</p>
                 </div>
                 <div id="pdfControls" class="hidden mt-6 overflow-x-auto flex space-x-3 pb-2"></div>
                 <button id="processBtn" class="w-full mt-6 bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg">ARCHITECT NOW ⚡</button>
             </div>
             <div id="statusBox" class="hidden bg-white p-6 rounded-2xl text-center shadow-md">
                 <div class="w-6 h-6 border-t-2 border-indigo-600 rounded-full animate-spin mx-auto mb-2"></div>
-                <p class="text-[10px] font-black uppercase italic text-slate-600">Architecting DNA Structure...</p>
+                <p class="text-[10px] font-black uppercase italic text-slate-600">Reconstructing Math Columns...</p>
             </div>
         </aside>
 
         <section class="lg:col-span-8">
-            <div class="bg-slate-900 rounded-t-2xl px-6 py-4 flex justify-between items-center shadow-xl">
+            <div class="bg-slate-900 rounded-t-2xl px-6 py-4 flex justify-between items-center">
                 <span class="text-slate-500 text-[9px] font-mono tracking-widest uppercase italic">DNA Terminal v2.0</span>
                 <div class="flex space-x-2">
                     <button id="copyBtn" class="hidden bg-slate-700 text-white text-[9px] px-3 py-1.5 rounded-lg">COPY</button>
@@ -61,80 +69,30 @@
         </section>
     </main>
 
-    <canvas id="pdfCanvas" class="hidden"></canvas>
-
     <script type="module">
         import { sharpenForAI, getEliteWordTemplate } from './formats.js';
-
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        
-        const state = { 
-            userId: localStorage.getItem('doc_user_id') || 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase(),
-            targetPage: 1
-        };
+        const state = { userId: localStorage.getItem('doc_user_id') || 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase() };
         localStorage.setItem('doc_user_id', state.userId);
         document.getElementById('displayUserId').innerText = state.userId;
 
         const fileInput = document.getElementById('fileInput');
         const dropZone = document.getElementById('dropZone');
         const outFrame = document.getElementById('outputFrame');
-        const pdfControls = document.getElementById('pdfControls');
 
         dropZone.onclick = () => fileInput.click();
-
-        fileInput.onchange = async () => {
-            const file = fileInput.files[0];
-            if (!file) return;
-            document.getElementById('dropText').innerText = file.name;
-            if (file.type === "application/pdf") {
-                const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
-                renderPreviews(pdf);
-            } else {
-                pdfControls.classList.add('hidden');
-                state.targetPage = 1;
-            }
-        };
-
-        async function renderPreviews(pdf) {
-            pdfControls.innerHTML = '';
-            pdfControls.classList.remove('hidden');
-            for (let i = 1; i <= Math.min(pdf.numPages, 12); i++) {
-                const page = await pdf.getPage(i);
-                const canvas = document.createElement('canvas');
-                canvas.className = `page-thumb shrink-0 border-2 border-transparent rounded-lg cursor-pointer w-16 bg-white ${i === 1 ? 'active' : ''}`;
-                const viewport = page.getViewport({ scale: 0.1 });
-                canvas.width = viewport.width; canvas.height = viewport.height;
-                await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
-                canvas.onclick = () => {
-                    state.targetPage = i;
-                    document.querySelectorAll('.page-thumb').forEach(el => el.classList.remove('active'));
-                    canvas.classList.add('active');
-                };
-                pdfControls.appendChild(canvas);
-            }
-        }
 
         document.getElementById('processBtn').onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return alert("Select file first!");
             document.getElementById('statusBox').classList.remove('hidden');
-            document.getElementById('topProgress').style.width = "40%";
             
             try {
-                const canvas = document.getElementById('pdfCanvas');
+                const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
-                if (file.type === "application/pdf") {
-                    const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
-                    const page = await pdf.getPage(state.targetPage);
-                    const viewport = page.getViewport({ scale: 2 });
-                    canvas.width = viewport.width; canvas.height = viewport.height;
-                    await page.render({ canvasContext: ctx, viewport }).promise;
-                } else {
-                    const img = new Image(); img.src = URL.createObjectURL(file);
-                    await new Promise(r => img.onload = r);
-                    canvas.width = img.width; canvas.height = img.height;
-                    ctx.drawImage(img, 0, 0);
-                }
+                const img = new Image(); img.src = URL.createObjectURL(file);
+                await new Promise(r => img.onload = r);
+                canvas.width = img.width; canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
                 sharpenForAI(canvas);
                 
                 const res = await fetch("/api/engine", {
@@ -143,42 +101,22 @@
                     body: JSON.stringify({ imageB64: canvas.toDataURL('image/jpeg', 0.7).split(',')[1], userInfo: { id: state.userId } })
                 });
 
-                // Improved Error Handler: Catch HTML and show as text
-                if (!res.ok) {
-                    let errorMessage = "Unknown Server Error";
-                    const contentType = res.headers.get("content-type");
-                    if (contentType && contentType.includes("application/json")) {
-                        const errData = await res.json();
-                        errorMessage = errData.error || errorMessage;
-                    } else {
-                        // This catches the "A server error..." text from Vercel
-                        errorMessage = await res.text();
-                    }
-                    throw new Error(errorMessage);
-                }
-
                 const data = await res.json();
+                if (!res.ok) throw new Error(data.error || "AI Error");
+                
                 document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 outFrame.classList.remove('hidden');
                 outFrame.srcdoc = getEliteWordTemplate(data.choices[0].message.content.replace(/```html|```/g, "").trim());
-                outFrame.onload = () => outFrame.contentDocument.body.contentEditable = 'true';
-                
                 document.getElementById('downloadBtn').classList.remove('hidden');
                 document.getElementById('copyBtn').classList.remove('hidden');
-                document.getElementById('topProgress').style.width = "100%";
                 document.getElementById('statusBox').classList.add('hidden');
-            } catch (err) { 
-                // Displays the real cause on screen
-                alert("Critical Error: " + err.message); 
-                document.getElementById('statusBox').classList.add('hidden');
-                document.getElementById('topProgress').style.width = "0%";
-            }
+            } catch (err) { alert(err.message); document.getElementById('statusBox').classList.add('hidden'); }
         };
 
         document.getElementById('copyBtn').onclick = () => { navigator.clipboard.writeText(outFrame.contentDocument.body.innerHTML); alert("Copied!"); };
         document.getElementById('downloadBtn').onclick = () => {
             const blob = new Blob(['\ufeff', outFrame.contentDocument.documentElement.outerHTML], { type: 'application/msword' });
-            saveAs(blob, 'Docufai_Export.doc');
+            saveAs(blob, 'Math_Exam_Export.doc');
         };
     </script>
 </body>
