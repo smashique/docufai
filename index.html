@@ -53,6 +53,7 @@
 
                 <button id="processBtn" class="w-full mt-6 bg-indigo-600 text-white font-black py-4 rounded-2xl shadow-lg active:scale-95 transition-all">ARCHITECT NOW ⚡</button>
             </div>
+            
             <div id="statusBox" class="hidden bg-white p-6 rounded-2xl text-center shadow-md">
                 <div class="w-6 h-6 border-t-2 border-indigo-600 rounded-full animate-spin mx-auto mb-2"></div>
                 <p class="text-[10px] font-black uppercase italic text-slate-600">Engineering Structure...</p>
@@ -83,7 +84,10 @@
         import { sharpenForAI, getEliteWordTemplate } from './formats.js';
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
-        const state = { userId: localStorage.getItem('doc_user_id') || 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase() };
+        
+        const state = { 
+            userId: localStorage.getItem('doc_user_id') || 'DOC-' + Math.random().toString(36).substr(2, 6).toUpperCase() 
+        };
         localStorage.setItem('doc_user_id', state.userId);
 
         const fileInput = document.getElementById('fileInput');
@@ -93,7 +97,11 @@
         const outFrame = document.getElementById('outputFrame');
         const topProgress = document.getElementById('topProgress');
 
-        document.getElementById('rechargeBtn').addEventListener('click', () => window.location.href = `/api/pay?userId=${state.userId}`);
+        // Recharge & Upload Listeners
+        document.getElementById('rechargeBtn').addEventListener('click', () => {
+            window.location.href = `/api/pay?userId=${state.userId}`;
+        });
+        
         dropZone.addEventListener('click', () => fileInput.click());
 
         fileInput.addEventListener('change', async () => {
@@ -105,7 +113,9 @@
                 const pdf = await pdfjsLib.getDocument(await file.arrayBuffer()).promise;
                 document.getElementById('totalPages').innerText = pdf.numPages;
                 renderPreviews(pdf);
-            } else { pdfControls.classList.add('hidden'); }
+            } else { 
+                pdfControls.classList.add('hidden'); 
+            }
         });
 
         async function renderPreviews(pdf) {
@@ -126,7 +136,7 @@
             }
         }
 
-        // --- মূল প্রসেসিং লজিক (ইমেজ কম্প্রেসার ও এরর গার্ডসহ) ---
+        // --- মূল প্রসেসিং লজিক ---
         document.getElementById('processBtn').onclick = async () => {
             const file = fileInput.files[0];
             if (!file) return alert("Select file first!");
@@ -153,7 +163,7 @@
 
                 sharpenForAI(canvas);
                 
-                // ছবির সাইজ ছোট করা (Timeout এড়াতে)
+                // ছবির সাইজ ছোট করা (Timeout এড়াতে JPEG ব্যবহার করা হয়েছে)
                 const b64Data = canvas.toDataURL('image/jpeg', 0.7).split(',')[1]; 
 
                 const res = await fetch("/api/engine", {
@@ -164,13 +174,13 @@
 
                 const data = await res.json();
                 
-                // এরর গার্ড: 'choices' এবং ক্রেডিট ডাটা চেক
+                // এরর গার্ড: 'choices' এবং ডাটা স্ট্রাকচার চেক
                 if (!res.ok || !data.choices || !data.choices[0]) {
                     throw new Error(data.error || "AI Response empty. Please try again.");
                 }
 
-                // ক্রেডিট ডিসপ্লে আপডেট (Safety Fix)
-                if (data.total_credits !== undefined && data.updated_count !== undefined) {
+                // ক্রেডিট ডিসপ্লে আপডেট (Safety Fix for Null Credits)
+                if (data && data.total_credits !== undefined && data.updated_count !== undefined) {
                     document.getElementById('remCredits').innerText = data.total_credits - data.updated_count;
                 }
 
@@ -192,6 +202,7 @@
             }
         };
 
+        // Copy & Download
         document.getElementById('copyBtn').addEventListener('click', () => {
             navigator.clipboard.writeText(outFrame.contentDocument.body.innerHTML);
             alert("HTML কপি হয়েছে!");
